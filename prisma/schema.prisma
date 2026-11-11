@@ -1,0 +1,16 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// HealthCheck model to verify schema migration in Phase 0
+model HealthCheck {
+  id        String   @id @default(cuid())
+  status    String   @default("ok")
+  checkedAt DateTime @default(now())
+}

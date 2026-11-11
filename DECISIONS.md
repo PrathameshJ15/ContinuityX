@@ -50,3 +50,14 @@ These resolve ambiguities in the locked V3.1 documents. They add no P0-A feature
 - [2026-11-12] | Added ExtractionRun model and extra Document, Claim, Verification, Entity, Conflict fields | Needed for caching, provenance, reproducibility and dates | TECH_DESIGN.md.
 - [2026-11-12] | Added AGENTS.md, SPEC.md, DEMO_AND_BENCHMARK.md, DEMO_AND_BENCHMARK.md, PROGRESS.md | Guide AI assistants, define receipt and dataset, plan the demo, track status | No scope change.
 - [2026-11-12] | Consolidated 20 markdown files into 8 | Fewer files reduce drift, contradictions and AI context load | Content unchanged; file references updated to SPEC.md, TECH_DESIGN.md, PLAN_AND_TESTING.md, DEMO_AND_BENCHMARK.md.
+
+---
+
+## Phase 0 Autonomous Decisions
+
+- [2026-11-12] | Auth Approach (autonomous): NextAuth.js / Auth.js with Credentials & JWT session | Chosen to enable server-side session checks (requireUser), simple demo logins without external identity dependencies, and 100% offline hermetic unit tests. Rejected: Clerk/Supabase Auth (external SaaS dependency, vendor lock-in, fails offline test requirement). | Clean session validation without exposing client credentials.
+- [2026-11-12] | Private File Storage (autonomous): Pluggable StorageProvider with LocalDiskStorage (dev/tests) and S3/R2 client (prod) | Local disk storage keeps dev/testing fast, hermetic, and cost-free, while S3/R2 with signed URLs satisfies the strict private file storage requirement in production. Rejected: Vercel Blob (public by default or requires custom proxying). | Zero permanent public URLs; files stream via permission-checked API routes.
+- [2026-11-12] | PDF Export Engine (autonomous): pdf-lib | Pure JavaScript/TypeScript with zero native binary or Chromium dependencies; guaranteed to run within Vercel serverless CPU/memory and 15s execution limits. Rejected: Puppeteer/Chromium (fragile on serverless, exceeds bundle limit, high cold start) and @react-pdf/renderer (heavier bundle and font issues). | Fast, deterministic byte generation for proof-carrying PDFs.
+- [2026-11-12] | Serverless Processing Pattern (autonomous): Step-wise Idempotent State Machine via ProcessingJob | Breaks document ingestion and AI verification into atomic, idempotent sub-steps keyed by checksum and lease locks, well within serverless function timeouts. Rejected: monolithic blocking route (hits 10s-15s Vercel timeouts) and Redis/BullMQ (adds external paid infrastructure). | Resilient job execution with status polling and visible retry capability.
+- [2026-11-12] | Gemini Model Tiering (autonomous): GEMINI_EXTRACTION_MODEL (gemini-1.5-flash) and GEMINI_JUDGE_MODEL (gemini-1.5-pro) | High-throughput structured JSON extraction via Flash tier; higher-reasoning zero-temperature judge via Pro tier to mitigate same-model confirmation bias. Rejected: single model for both tasks. | Model name and prompt version recorded on every run for reproducibility.
+
