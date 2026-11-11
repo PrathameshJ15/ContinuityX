@@ -61,3 +61,12 @@ These resolve ambiguities in the locked V3.1 documents. They add no P0-A feature
 - [2026-11-12] | Serverless Processing Pattern (autonomous): Step-wise Idempotent State Machine via ProcessingJob | Breaks document ingestion and AI verification into atomic, idempotent sub-steps keyed by checksum and lease locks, well within serverless function timeouts. Rejected: monolithic blocking route (hits 10s-15s Vercel timeouts) and Redis/BullMQ (adds external paid infrastructure). | Resilient job execution with status polling and visible retry capability.
 - [2026-11-12] | Gemini Model Tiering (autonomous): GEMINI_EXTRACTION_MODEL (gemini-1.5-flash) and GEMINI_JUDGE_MODEL (gemini-1.5-pro) | High-throughput structured JSON extraction via Flash tier; higher-reasoning zero-temperature judge via Pro tier to mitigate same-model confirmation bias. Rejected: single model for both tasks. | Model name and prompt version recorded on every run for reproducibility.
 
+---
+
+## Phase 1 Autonomous Decisions
+
+- [2026-11-12] | Unified 404 Not Found for Missing Project and Non-Membership (autonomous) | In requireProjectAccess(), return HTTP 404 ("Project not found or you do not have permission to access it") for both non-existent project IDs and projects where the requesting user has no active membership. Rejected: HTTP 403 for non-members (reveals project existence to unauthorized probers via ID guessing / resource enumeration). | Eliminates project enumeration attacks while strictly denying unauthorized access.
+- [2026-11-12] | Authoritative Typed Permission Matrix (autonomous) | Defined PERMISSION_MATRIX as a single immutable typed constant mapping all domain actions to allowed ProjectRole enums (OWNER, REVIEWER, VIEWER). Rejected: distributed in-route permission checks (prone to drift and omission). | Matrix is 100% testable; unit tests are generated dynamically across every role-permission pair.
+- [2026-11-12] | Last-OWNER Invariant Safeguard (autonomous) | Both changeMemberRoleService() and removeMemberService() enforce that an OWNER cannot be demoted or removed if ownerCount <= 1. Rejected: client-side-only checks or allowing orphaned projects without owners. | Prevents unmanageable orphaned project workspaces.
+
+
