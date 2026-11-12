@@ -11,6 +11,7 @@ export interface QARequest {
   projectId: string;
   question: string;
   userId: string;
+  timeoutMs?: number;
 }
 
 export interface QACitation {
@@ -217,13 +218,23 @@ Answer based strictly on the approved claims above. If supported, list the exact
   };
 
   try {
-    const llmResponse = await llmProvider.generateStructuredText({
-      model: env.GEMINI_JUDGE_MODEL || env.GEMINI_EXTRACTION_MODEL,
-      systemInstruction,
-      userPrompt,
-      temperature: 0,
-      responseJsonSchema,
+    const timeoutMs = request.timeoutMs ?? 25000;
+    let timer: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`LLM request timed out after ${timeoutMs}ms`)), timeoutMs);
     });
+
+    const llmResponse = await Promise.race([
+      llmProvider.generateStructuredText({
+        model: env.GEMINI_JUDGE_MODEL || env.GEMINI_EXTRACTION_MODEL,
+        systemInstruction,
+        userPrompt,
+        temperature: 0,
+        responseJsonSchema,
+      }),
+      timeoutPromise,
+    ]);
+    if (timer) clearTimeout(timer);
 
     const parsed = JSON.parse(llmResponse.text) as {
       answer?: string;

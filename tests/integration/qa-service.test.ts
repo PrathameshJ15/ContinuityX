@@ -270,4 +270,41 @@ describe("Phase 8 Handover Q&A Service Integration", () => {
       )
     ).rejects.toThrow(ProjectNotFoundError);
   });
+
+  it("8. fails gracefully to fixed refusal when LLM provider exceeds timeout", async () => {
+    const claim1 = {
+      id: "claim-timeout-1",
+      attributeKey: "owner",
+      valueRaw: "Bob",
+      valueNormalized: "Bob",
+      subjectEntity: {
+        canonicalName: "Billing Service",
+        aliases: [],
+      },
+      verifications: [{ status: "VERIFIED" }],
+      evidence: [],
+    };
+
+    vi.mocked(prisma.claim.findMany).mockResolvedValue([claim1 as any]);
+
+    // Provider hangs longer than timeoutMs
+    vi.mocked(mockLLMProvider.generateStructuredText).mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 500))
+    );
+
+    const response = await askHandoverQuestionService(
+      {
+        projectId: "proj-1",
+        question: "Who owns Billing Service?",
+        userId: viewerUser.id,
+        timeoutMs: 50, // 50ms short timeout
+      },
+      mockLLMProvider
+    );
+
+    expect(response.supported).toBe(false);
+    expect(response.answer).toBe(FIXED_REFUSAL_MESSAGE);
+    expect(response.modelCalled).toBe(true);
+    expect(response.citations).toEqual([]);
+  });
 });
