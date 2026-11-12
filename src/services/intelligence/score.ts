@@ -35,6 +35,7 @@ export interface BusFactorMapResult {
   components: BusFactorItem[];
   totalComponents: number;
   singleOwnerCount: number;
+  totalClaims: number;
   disclaimer: string;
 }
 
@@ -327,6 +328,7 @@ export async function computeContinuityIntelligenceService(
     components: busFactorItems,
     totalComponents: busFactorItems.length,
     singleOwnerCount,
+    totalClaims: claims.length,
     disclaimer: "Ownership-concentration indicator, not a statistical measure. Highlights modules where key knowledge rests with a single contributor.",
   };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
+import Link from "next/link";
 import {
   AlertCircle,
   AlertTriangle,
@@ -52,6 +53,7 @@ interface BusFactorMapResult {
   components: BusFactorItem[];
   totalComponents: number;
   singleOwnerCount: number;
+  totalClaims?: number;
   disclaimer: string;
 }
 
@@ -433,13 +435,33 @@ export default function ContinuityIntelligencePage({
               </div>
 
               {/* Component Cards */}
-              {busFactorData.components.length === 0 ? (
+              {busFactorData.totalClaims === 0 ? (
+                <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
+                  <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="font-semibold text-foreground">No claims yet. Upload documents and run extraction first</p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-4">
+                    Upload architecture documents to extract COMPONENT entities and owner claims.
+                  </p>
+                  <Link
+                    href={`/projects/${projectId}/documents`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    Go to Documents
+                  </Link>
+                </div>
+              ) : busFactorData.components.length === 0 ? (
                 <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
                   <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                   <p className="font-medium text-foreground">No Component Entities Found</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Upload architecture documents to extract COMPONENT entities and owner claims.
+                  <p className="text-xs text-muted-foreground mt-1 mb-4">
+                    No entities of type COMPONENT were detected in the extracted claims. Upload architecture documents to extract COMPONENT entities and owner claims.
                   </p>
+                  <Link
+                    href={`/projects/${projectId}/documents`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    Go to Documents
+                  </Link>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

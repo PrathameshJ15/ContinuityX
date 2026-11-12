@@ -137,4 +137,15 @@ describe("Phase 7 Radar Service Integration & Audit Dismissals", () => {
       computeRadarAlertsService("proj-1", nonMemberUser.id)
     ).rejects.toThrow(ProjectNotFoundError);
   });
+
+  it("reports totalClaims in metrics so client distinguishes no-data empty state from zero-risk state", async () => {
+    vi.mocked(prisma.projectMember.findUnique).mockResolvedValue(
+      makeMembership(reviewerUser.id, "REVIEWER")
+    );
+    vi.mocked(prisma.claim.findMany).mockResolvedValue([]);
+
+    const result = await computeRadarAlertsService("proj-1", reviewerUser.id);
+    expect(result.metrics.totalClaims).toBe(0);
+    expect(result.metrics.totalOpen).toBe(0);
+  });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
+import Link from "next/link";
 import {
   AlertCircle,
   AlertTriangle,
@@ -53,6 +54,7 @@ interface RadarAlert {
 interface RadarMetrics {
   totalOpen: number;
   totalDismissed: number;
+  totalClaims?: number;
   bySeverity: {
     HIGH: number;
     MEDIUM: number;
@@ -364,6 +366,20 @@ export default function RadarPage({
         <div className="flex flex-col items-center justify-center p-16 text-muted-foreground">
           <Loader2 className="h-8 w-8 animate-spin mb-3 text-primary" />
           <p className="text-sm">Scanning project knowledge graph with Radar rules...</p>
+        </div>
+      ) : metrics?.totalClaims === 0 ? (
+        <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
+          <ShieldAlert className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+          <p className="font-semibold text-foreground">No claims yet. Upload documents and run extraction first</p>
+          <p className="text-xs text-muted-foreground mt-1 mb-4">
+            Upload source documents and run automated claim extraction to begin scanning for knowledge loss risks.
+          </p>
+          <Link
+            href={`/projects/${projectId}/documents`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Go to Documents
+          </Link>
         </div>
       ) : alerts.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">

@@ -77,7 +77,9 @@ export async function GET(
       },
     });
 
-    return jsonSuccess({ conflicts });
+    const totalProjectClaims = await prisma.claim.count({ where: { projectId } });
+
+    return jsonSuccess({ conflicts, totalProjectClaims });
   } catch (error) {
     return handleApiError(error);
   }

@@ -53,6 +53,7 @@ export interface RadarAlert {
 export interface RadarMetrics {
   totalOpen: number;
   totalDismissed: number;
+  totalClaims: number;
   bySeverity: {
     HIGH: number;
     MEDIUM: number;
@@ -515,6 +516,7 @@ export async function computeRadarAlertsService(
   const metrics: RadarMetrics = {
     totalOpen: openAlerts.length,
     totalDismissed: dismissedAlerts.length,
+    totalClaims: claims.length,
     bySeverity,
     byRule,
   };

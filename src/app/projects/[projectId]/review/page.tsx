@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
+import Link from "next/link";
 import {
   AlertCircle,
   AlertTriangle,
@@ -380,6 +381,20 @@ export default function ReviewSplitPanePage({
         <div className="rounded-xl border bg-card p-16 text-center text-muted-foreground">
           <Loader2 className="h-8 w-8 mx-auto animate-spin mb-3 text-primary" />
           <p className="text-sm">Loading review candidate queue...</p>
+        </div>
+      ) : queueData?.metrics.totalClaims === 0 ? (
+        <div className="rounded-xl border bg-card p-16 text-center text-muted-foreground">
+          <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+          <h3 className="font-bold text-foreground text-lg">No claims yet. Upload documents and run extraction first</h3>
+          <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 mb-4">
+            Upload project documentation and run automated claim extraction to populate the evidence review queue.
+          </p>
+          <Link
+            href={`/projects/${projectId}/documents`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Go to Documents
+          </Link>
         </div>
       ) : !currentClaim ? (
         <div className="rounded-xl border bg-card p-16 text-center text-muted-foreground">

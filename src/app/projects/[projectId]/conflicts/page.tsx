@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   Calendar,
@@ -82,6 +83,7 @@ export default function ConflictsPage({
   const projectId = resolvedParams.projectId;
 
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
+  const [totalClaims, setTotalClaims] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -108,6 +110,7 @@ export default function ConflictsPage({
       if (!res.ok) throw new Error(json.error?.message || "Failed to load conflicts");
 
       setConflicts(json.data.conflicts || []);
+      setTotalClaims(typeof json.data.totalProjectClaims === "number" ? json.data.totalProjectClaims : null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load conflicts");
     } finally {
@@ -300,6 +303,20 @@ export default function ConflictsPage({
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
           <Loader2 className="h-8 w-8 mx-auto animate-spin mb-3 text-primary" />
           <p className="text-sm">Scanning and loading pairwise conflicts...</p>
+        </div>
+      ) : totalClaims === 0 ? (
+        <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
+          <ShieldAlert className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+          <h3 className="font-semibold text-foreground text-base">No claims yet. Upload documents and run extraction first</h3>
+          <p className="text-xs text-muted-foreground mt-1 mb-4">
+            Pairwise contradiction and conflict detection requires extracted claims to compare against each other.
+          </p>
+          <Link
+            href={`/projects/${projectId}/documents`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Go to Documents
+          </Link>
         </div>
       ) : conflicts.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
