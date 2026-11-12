@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react";
-import { z } from "zod";
 import { entityNameSchema, entityAliasSchema, createEntitySchema } from "@/services/entities/schema";
 import { normalizeEntityKey } from "@/services/entities/resolution";
 import {
