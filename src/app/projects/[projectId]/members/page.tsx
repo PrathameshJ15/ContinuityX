@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react";
+import { formatDate } from "@/lib/date";
 import {
   UserPlus,
   Shield,
@@ -323,7 +324,7 @@ export default function MembersPage({
                     </td>
 
                     <td className="px-6 py-4 text-xs text-muted-foreground">
-                      {new Date(member.joinedAt).toLocaleDateString()}
+                      {formatDate(member.joinedAt)}
                     </td>
 
                     {isOwner && (

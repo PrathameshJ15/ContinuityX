@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatDate } from "@/lib/date";
 import {
   ShieldCheck,
   Plus,
@@ -255,7 +256,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
-                    <span>{new Date(proj.createdAt).toLocaleDateString()}</span>
+                    <span>{formatDate(proj.createdAt)}</span>
                   </div>
                 </div>
               </Link>

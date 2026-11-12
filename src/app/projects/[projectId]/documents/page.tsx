@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react";
+import { formatDate } from "@/lib/date";
 import {
   Upload,
   FileText,
@@ -573,7 +574,7 @@ export default function DocumentsPage({
                             <div className="space-y-0.5">
                               <div className="font-medium flex items-center gap-1">
                                 <Calendar className="h-3 w-3 text-primary" />
-                                {new Date(doc.sourceDate).toLocaleDateString()}
+                                {formatDate(doc.sourceDate)}
                               </div>
                               <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.2 rounded">
                                 {doc.sourceDateBasis}

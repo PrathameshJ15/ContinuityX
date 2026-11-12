@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
+import { formatDate } from "@/lib/date";
 import {
   AlertCircle,
   AlertTriangle,
@@ -606,7 +607,7 @@ export default function ReviewSplitPanePage({
                           <strong>File:</strong> {ev.document.fileName}
                         </div>
                         <div>
-                          <strong>Source Date:</strong> {ev.document.sourceDate ? new Date(ev.document.sourceDate).toLocaleDateString() : "(none)"} (basis: {ev.document.sourceDateBasis})
+                          <strong>Source Date:</strong> {ev.document.sourceDate ? formatDate(ev.document.sourceDate) : "(none)"} (basis: {ev.document.sourceDateBasis})
                         </div>
                         <div>
                           <strong>Location:</strong> {ev.sourceLocation}

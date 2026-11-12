@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
+import { formatDate } from "@/lib/date";
 import {
   AlertCircle,
   AlertTriangle,
@@ -344,7 +345,7 @@ export default function HandoverPage({
               <option value="DRAFT">Draft Preview (Latest Accepted)</option>
               {handoversList.map((h) => (
                 <option key={h.id} value={h.version}>
-                  Version {h.version} ({new Date(h.approvedAt || h.generatedAt).toLocaleDateString()})
+                  Version {h.version} ({formatDate(h.approvedAt || h.generatedAt)})
                 </option>
               ))}
             </select>

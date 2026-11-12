@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use, useCallback } from "react";
 import Link from "next/link";
+import { formatDate } from "@/lib/date";
 import {
   Calendar,
   User,
@@ -309,7 +310,7 @@ export default function ProjectOverviewPage({
           </div>
           <div>
             <div className="text-xs text-muted-foreground">Created On</div>
-            <div className="font-semibold text-sm">{new Date(project.createdAt).toLocaleDateString()}</div>
+            <div className="font-semibold text-sm">{formatDate(project.createdAt)}</div>
           </div>
         </div>
       </div>

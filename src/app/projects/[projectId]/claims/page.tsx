@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react";
+import { formatDate, formatDateTime } from "@/lib/date";
 import {
   AlertCircle,
   AlertTriangle,
@@ -650,7 +651,7 @@ export default function ClaimsPage({
                       </span>
                       <span>
                         Date basis: {ev.document.sourceDateBasis}
-                        {ev.document.sourceDate ? ` (${new Date(ev.document.sourceDate).toLocaleDateString()})` : ""}
+                        {ev.document.sourceDate ? ` (${formatDate(ev.document.sourceDate)})` : ""}
                       </span>
                     </div>
                     <blockquote className="italic text-foreground/90 border-l-2 border-primary/40 pl-2.5">
@@ -764,7 +765,7 @@ export default function ClaimsPage({
               </div>
 
               <div className="text-[11px] text-muted-foreground text-right pt-2 border-t">
-                Rule set version: {inspectingVerification.ruleSetVersion} · Verified: {new Date(inspectingVerification.verifiedAt).toLocaleString()}
+                Rule set version: {inspectingVerification.ruleSetVersion} · Verified: {formatDateTime(inspectingVerification.verifiedAt)}
               </div>
             </div>
           </div>

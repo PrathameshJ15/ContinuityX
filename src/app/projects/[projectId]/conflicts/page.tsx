@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
+import { formatDate, formatDateTime } from "@/lib/date";
 import {
   AlertTriangle,
   Calendar,
@@ -403,7 +404,7 @@ export default function ConflictsPage({
                           &ldquo;{conflict.claimA.evidence[0].excerpt}&rdquo;
                         </blockquote>
                         <div className="text-[11px] text-muted-foreground">
-                          Date: {conflict.claimA.evidence[0].document.sourceDate ? new Date(conflict.claimA.evidence[0].document.sourceDate).toLocaleDateString() : "(none)"} (basis: {conflict.claimA.evidence[0].document.sourceDateBasis})
+                          Date: {conflict.claimA.evidence[0].document.sourceDate ? formatDate(conflict.claimA.evidence[0].document.sourceDate) : "(none)"} (basis: {conflict.claimA.evidence[0].document.sourceDateBasis})
                         </div>
                       </div>
                     )}
@@ -438,7 +439,7 @@ export default function ConflictsPage({
                           &ldquo;{conflict.claimB.evidence[0].excerpt}&rdquo;
                         </blockquote>
                         <div className="text-[11px] text-muted-foreground">
-                          Date: {conflict.claimB.evidence[0].document.sourceDate ? new Date(conflict.claimB.evidence[0].document.sourceDate).toLocaleDateString() : "(none)"} (basis: {conflict.claimB.evidence[0].document.sourceDateBasis})
+                          Date: {conflict.claimB.evidence[0].document.sourceDate ? formatDate(conflict.claimB.evidence[0].document.sourceDate) : "(none)"} (basis: {conflict.claimB.evidence[0].document.sourceDateBasis})
                         </div>
                       </div>
                     )}
@@ -453,7 +454,7 @@ export default function ConflictsPage({
                       <strong>Resolution Record:</strong> {conflict.resolutionNotes}
                       {conflict.resolvedByUser && (
                         <span className="block text-[11px] text-muted-foreground/80 mt-0.5">
-                          Resolved by {conflict.resolvedByUser.name} ({conflict.resolvedByUser.email}) on {new Date(conflict.resolvedAt!).toLocaleString()}
+                          Resolved by {conflict.resolvedByUser.name} ({conflict.resolvedByUser.email}) on {formatDateTime(conflict.resolvedAt!)}
                         </span>
                       )}
                     </div>

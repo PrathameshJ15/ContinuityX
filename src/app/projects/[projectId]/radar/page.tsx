@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
+import { formatDate } from "@/lib/date";
 import {
   AlertCircle,
   AlertTriangle,
@@ -447,7 +448,7 @@ export default function RadarPage({
                 <div className="rounded-lg bg-muted p-3 text-xs space-y-1 border">
                   <div className="font-semibold text-foreground">
                     Dismissed by {alert.dismissedBy?.name || "Reviewer"} on{" "}
-                    {alert.dismissedAt ? new Date(alert.dismissedAt).toLocaleDateString() : ""}:
+                    {alert.dismissedAt ? formatDate(alert.dismissedAt) : ""}:
                   </div>
                   <p className="text-muted-foreground italic">&ldquo;{alert.dismissedReason}&rdquo;</p>
                 </div>
