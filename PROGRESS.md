@@ -10,7 +10,7 @@ Update at the end of every phase and every work session. Status comes from the r
 | 3 | AI Claim Extraction & Entity Registry | Done | Yes | 2026-11-12 | Extraction pipeline, entity registry, vocabulary normalization, injection defense, 114 tests pass |
 | 4 | Proof-Carrying Verification Engine | Done | Yes | 2026-11-12 | 4-gate verification engine, SPEC.md V3.2 9-row status table, DEV eval 15/15 matched, 148 tests pass |
 | 5 | Conflict Detection & Human Review | Done | Yes | 2026-11-12 | Conflict models, resolution engine, split-pane review, review queue, 159 tests pass |
-| 6 | Handover Generation & SHA-256 Receipt | Not started | No | | |
+| 6 | Handover Generation & SHA-256 Receipt | Done | Yes | 2026-11-12 | Handover models, SHA-256 canonical receipt, pdf-lib export, tamper detection, 173 tests pass, P0-A CHECKPOINT PASSED |
 | 7 | Knowledge Loss Radar | Not started | No | | |
 | 8 | Continuity Intelligence | Not started | No | | |
 | 9 | Security, Testing, UI Polish, Benchmark, Release | Not started | No | | |
@@ -352,8 +352,101 @@ All review and conflict operations require valid project membership and specific
 - `GET /api/projects/[id]/review/queue`: `claims:view_unapproved` (OWNER, REVIEWER).
 - `GET /api/projects/[id]/conflicts`: `claims:view_unapproved` (OWNER, REVIEWER).
 - `GET /api/projects/[id]/conflicts/[conflictId]`: `claims:view_unapproved` (OWNER, REVIEWER).
-- VIEWER role receives HTTP 403 Forbidden for review and conflict resolution actions.
-- Non-members and missing projects receive HTTP 404 Not Found (no project enumeration).
+---
+
+## Phase 6 Standard Phase Report (P0-A CHECKPOINT)
+
+### Status: P0-A checkpoint PASSED
+The complete P0-A flow (auth, workspaces, document intelligence, AI claim extraction, entity registry, 4-gate verification engine, conflict detection, human review queue, handover snapshot, SHA-256 receipt, and proof-carrying PDF export) runs end-to-end on real persisted data with 173 automated tests passing.
+
+### 1. What was built
+- **Database Models & Enums:**
+  - `HandoverStatus` enum (`DRAFT`, `APPROVED`).
+  - `Handover` model (`id`, `projectId`, `version`, `status`, `title`, `summary`, `generatedAt`, `approvedAt`, `approvedById`, `createdAt`, `updatedAt`). Unique on `[projectId, version]`.
+  - `HandoverSnapshot` model (`id`, `handoverId`, `canonicalJson`, `schemaVersion`, `canonicalisationVersion`, `createdAt`). Immutable stored snapshot.
+  - `HandoverReceipt` model (`id`, `handoverId`, `version`, `snapshotHash`, `previousReceiptHash`, `approvedById`, `approvedAt`, `canonicalisationVersion`). Cryptographic hash chain.
+  - Live Neon PostgreSQL migration deployed: `20261112190000_init_phase6_handovers_receipts`.
+- **Deterministic Canonicalisation Engine (`src/services/handover/canonical.ts`):**
+  - Canonical JSON serializer according to RFC 8785:
+    - Object keys sorted lexicographically.
+    - Arrays deterministically sorted: `claims` by `(claimId, claimVersion)`, `evidence` by `(documentId, location)`, `resolvedConflicts` by `conflictId`.
+    - Strings normalized to Unicode NFC.
+    - Compact JSON without whitespace.
+    - Computes 64-character lowercase SHA-256 hex string over UTF-8 bytes.
+- **Authoritative 14-Section Assembly (`src/services/handover/sections.ts`):**
+  - Section 1: Executive Summary (claim counts, verification metrics, key facts).
+  - Section 2: Objectives & Goals.
+  - Section 3: Current Status.
+  - Section 4: Technical Architecture.
+  - Section 5: Decisions with Rationale.
+  - Section 6: Completed Tasks.
+  - Section 7: Pending Tasks.
+  - Section 8: Ownership & Responsibilities.
+  - Section 9: Dependencies.
+  - Section 10: Risks & Blockers.
+  - Section 11: Unresolved Questions.
+  - Section 12: Recommended Next Actions (rule-derived: unassigned pending tasks, open questions, unresolved conflicts).
+  - Section 13: Evidence References (unique source documents, checksums, locations).
+  - Section 14: Approval Receipt (hash, version, approver, timestamp, previous hash).
+  - Strict Invariant: Empty sections state `"No approved information"`; zero LLM-invented prose.
+- **Handover Service & Atomic Transaction (`src/services/handover/index.ts`):**
+  - `getHandoverDraftPreviewService()`: Validates draft and blocks approval if no claims are accepted or if any accepted claim is in an active `OPEN` conflict.
+  - `approveHandoverService()`: Atomic Prisma transaction (`prisma.$transaction`) creating `Handover`, `HandoverSnapshot`, and `HandoverReceipt` together with `AuditLog` entry and linking `previousReceiptHash` chain.
+  - `listHandoversService()` & `getHandoverByIdService()`: Permission-checked handover readers.
+  - `verifyHandoverReceiptService()`: Two-way tamper check (recomputing snapshot hash vs receipt hash, and rebuilding live database claims vs receipt hash).
+  - `exportHandoverPdfService()`: Pure-JS serverless PDF generation from stored snapshot.
+- **Pure-JS PDF Export Engine (`src/services/handover/pdf-exporter.ts`):**
+  - Generated via `pdf-lib` directly from stored canonical JSON (never live tables).
+  - Renders document header, cryptographic receipt box, all 14 sections, explicit text status labels (`[VERIFIED]`, `[WEAK_SUPPORT]`), reviewer written reasons, evidence citations, and page numbering ("Page X of Y").
+  - Escapes text to guarantee serverless reliability without native binary dependencies.
+- **API Endpoints:**
+  - `GET /api/projects/[id]/handovers`: List approved handovers (OWNER, REVIEWER, VIEWER).
+  - `POST /api/projects/[id]/handovers`: Approve handover in atomic transaction (OWNER, REVIEWER).
+  - `GET /api/projects/[id]/handovers/draft`: Draft preview with blocking check (OWNER, REVIEWER).
+  - `GET /api/projects/[id]/handovers/[handoverId]`: Retrieve approved handover & receipt (OWNER, REVIEWER, VIEWER).
+  - `POST /api/projects/[id]/handovers/[handoverId]/verify-receipt`: Verify receipt tamper check (OWNER, REVIEWER, VIEWER).
+  - `GET /api/projects/[id]/handovers/[handoverId]/export`: Download proof-carrying PDF (OWNER, REVIEWER, VIEWER).
+- **UI Screen (`src/app/projects/[projectId]/handover/page.tsx`):**
+  - Version selector dropdown (Draft Preview vs approved versions).
+  - Approval Confirmation modal with invariant checks and custom title input.
+  - Cryptographic Approval Receipt card with 1-click Copy Hash button, previous receipt hash chain, and "Integrity fingerprint, not a digital signature" notice.
+  - Interactive "Verify Receipt" button with two-way cryptographic verification dialog.
+  - Direct "Export PDF" download button.
+  - Collapsible cards for all 14 sections with explicit text indicators and cited excerpts.
+  - Workspace layout navigation updated with `Handover` tab.
+
+### 2. Commands run and their real results
+- `npx prisma migrate deploy`: Exit code 0 (applied migration `20261112190000_init_phase6_handovers_receipts` to Neon PostgreSQL).
+- `npx prisma generate`: Exit code 0 (Prisma Client updated with Phase 6 models).
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm test`: Exit code 0 (173 tests passed across 20 test suites, including 7 new canonicalization/hash tests and 7 integration tests).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm run build`: Exit code 0 (all 46 Next.js routes compiled cleanly).
+
+### 3. Exit-criteria checklist (P0-A Checkpoint)
+- [x] The complete P0-A flow runs end to end on real persisted data — **PASS**
+- [x] Approval creates snapshot and receipt atomically; golden hash tests pass — **PASS**
+- [x] The PDF is usable, shows statuses as text, evidence and the receipt — **PASS**
+- [x] Editing an approved claim in the database makes receipt verification fail — **PASS** (Check 2 live data integrity catches claim drift)
+- [x] No LLM-generated unverified prose in the handover — **PASS**
+- [x] typecheck, lint, tests and build pass, and the Neon deployment works with the new migration — **PASS**
+
+### 4. Deviations and DECISIONS.md entries
+- Added 3 Phase 6 entries in `DECISIONS.md`:
+  - `[2026-11-12] | Canonical Snapshot Serialization & Deterministic Array Sorting`
+  - `[2026-11-12] | Two-Way Receipt Verification & Tamper Detection`
+  - `[2026-11-12] | Pure-JS Serverless PDF Generation via pdf-lib`
+
+### 5. Security confirmation: Handover routes enforcement
+- `POST /api/projects/[id]/handovers`: `handover:approve` (OWNER, REVIEWER).
+- `GET /api/projects/[id]/handovers/draft`: `handover:approve` (OWNER, REVIEWER).
+- `GET /api/projects/[id]/handovers`: `handover:view_approved` (OWNER, REVIEWER, VIEWER).
+- `GET /api/projects/[id]/handovers/[handoverId]`: `handover:view_approved` (OWNER, REVIEWER, VIEWER).
+- `GET /api/projects/[id]/handovers/[handoverId]/export`: `handover:view_approved` (OWNER, REVIEWER, VIEWER).
+- `POST /api/projects/[id]/handovers/[handoverId]/verify-receipt`: `handover:view_approved` (OWNER, REVIEWER, VIEWER).
+- VIEWER role is strictly forbidden from approving handovers (HTTP 403).
+- Non-members receive HTTP 404 Not Found (no project enumeration).
+
 
 
 

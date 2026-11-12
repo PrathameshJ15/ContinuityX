@@ -104,6 +104,15 @@ These resolve ambiguities in the locked V3.1 documents. They add no P0-A feature
 - [2026-11-12] | Strict Co-Ownership Restriction for `KEEP_BOTH` Conflict Resolution (autonomous) | `KEEP_BOTH` (`RESOLVED_MUTUAL_ACCEPT`) is restricted strictly to multi-cardinality attributes (`attributeKey === 'owner'`), asserting co-ownership. For single-cardinality attributes (e.g. `status`, `selected_technology`), `KEEP_BOTH` is rejected with HTTP 400. Rejected: allowing mutual acceptance of contradictory single-valued statuses. | Guarantees semantic consistency in resolved claim sets.
 - [2026-11-12] | Review Queue Ordering with Conflict Blocking (autonomous) | The human review queue prioritizes claims with open conflicts first, followed by unverified/weak claims, and blocks acceptance of any claim with an active `OPEN` conflict until the conflict is resolved. Rejected: allowing acceptance of conflicting claims before resolving the dispute. | Guarantees that conflicting assertions cannot bypass resolution into an approved handover.
 
+---
+
+## Phase 6 Autonomous Decisions
+
+- [2026-11-12] | Canonical Snapshot Serialization & Deterministic Array Sorting (autonomous) | Implemented canonical snapshot engine (`src/services/handover/canonical.ts`) with schemaVersion 1 and canonicalisationVersion 1. Sorts object keys lexicographically, sorts claims by `(claimId, claimVersion)`, sorts evidence by `(documentId, location)`, sorts conflicts by `conflictId`, and normalizes strings to Unicode NFC before computing the SHA-256 hash. Rejected: non-deterministic JSON.stringify or relying on database insertion order. | Ensures that snapshot hashes are completely reproducible and invariant to row retrieval order.
+- [2026-11-12] | Two-Way Receipt Verification & Tamper Detection (autonomous) | Verify Receipt executes two distinct checks: (1) stored snapshot canonical JSON hash vs receipt hash, and (2) live database claims reconstruction vs receipt hash. Rejected: single-sided check. | Distinguishes between direct database snapshot tampering and subsequent out-of-band updates to approved claims.
+- [2026-11-12] | Pure-JS Serverless PDF Generation via pdf-lib (autonomous) | Generates proof-carrying PDF exports directly from the immutable stored canonical snapshot with standard font embedding, multi-page layout, explicit text status labels (`[VERIFIED]`, `[WEAK_SUPPORT]`), reviewer justifications, verbatim evidence citations, and cryptographic receipt block. Rejected: headless browser / Puppeteer rendering. | Guaranteed fast, deterministic generation within serverless CPU and memory limits with zero external native binaries.
+
+
 
 
 

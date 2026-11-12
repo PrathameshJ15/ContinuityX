@@ -60,6 +60,18 @@ export class ForbiddenError extends AppError {
   }
 }
 
+export class BadRequestError extends AppError {
+  constructor(message: string = "Bad request", details?: unknown) {
+    super("BAD_REQUEST", message, 400, details);
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(message: string = "Resource not found.") {
+    super("NOT_FOUND", message, 404);
+  }
+}
+
 export function jsonSuccess<T>(data: T, status: number = 200) {
   return NextResponse.json({ data }, { status });
 }

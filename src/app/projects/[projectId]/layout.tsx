@@ -14,6 +14,7 @@ import {
   Loader2,
   AlertOctagon,
   AlertTriangle,
+  Award,
   CheckSquare,
 } from "lucide-react";
 
@@ -139,6 +140,12 @@ export default function ProjectWorkspaceLayout({
       href: `/projects/${projectId}/review`,
       icon: CheckSquare,
       active: pathname.startsWith(`/projects/${projectId}/review`),
+    },
+    {
+      name: "Handover",
+      href: `/projects/${projectId}/handover`,
+      icon: Award,
+      active: pathname.startsWith(`/projects/${projectId}/handover`),
     },
     {
       name: "Entities",
