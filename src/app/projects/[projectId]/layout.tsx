@@ -13,6 +13,8 @@ import {
   Network,
   Loader2,
   AlertOctagon,
+  AlertTriangle,
+  CheckSquare,
 } from "lucide-react";
 
 interface ProjectDetails {
@@ -124,7 +126,19 @@ export default function ProjectWorkspaceLayout({
       name: "Claims",
       href: `/projects/${projectId}/claims`,
       icon: ListChecks,
-      active: pathname.startsWith(`/projects/${projectId}/claims`),
+      active: pathname === `/projects/${projectId}/claims`,
+    },
+    {
+      name: "Conflicts",
+      href: `/projects/${projectId}/conflicts`,
+      icon: AlertTriangle,
+      active: pathname.startsWith(`/projects/${projectId}/conflicts`),
+    },
+    {
+      name: "Evidence Review",
+      href: `/projects/${projectId}/review`,
+      icon: CheckSquare,
+      active: pathname.startsWith(`/projects/${projectId}/review`),
     },
     {
       name: "Entities",

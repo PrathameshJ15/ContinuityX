@@ -123,6 +123,8 @@ enum ConflictType {
 enum ConflictResolutionState {
   OPEN
   POSSIBLY_SUPERSEDED
+  REQUIRES_CLARIFICATION
+  UNDER_REVIEW
   RESOLVED_MUTUAL_ACCEPT
   RESOLVED_ONE_ACCEPTED
   RESOLVED_BOTH_REJECTED
@@ -140,6 +142,9 @@ model User {
   createdProjects   Project[]       @relation("ProjectCreator")
   uploadedDocuments Document[]
   auditLogs         AuditLog[]
+  reviews           Review[]
+  reviewActions     ReviewAction[]
+  resolvedConflicts Conflict[]      @relation("ConflictResolver")
 
   @@index([email])
 }
@@ -160,6 +165,8 @@ model Project {
   claims         Claim[]
   conflicts      Conflict[]
   auditLogs      AuditLog[]
+  reviews        Review[]
+  reviewActions  ReviewAction[]
 
   @@index([createdBy])
   @@index([status])
@@ -349,6 +356,7 @@ model Claim {
   verifications     Verification[]
   conflictsAsA      Conflict[]      @relation("ConflictClaimA")
   conflictsAsB      Conflict[]      @relation("ConflictClaimB")
+  reviews           Review[]
 
   @@index([projectId, subjectEntityId, attributeKey])
   @@index([projectId, category, reviewState])
@@ -416,6 +424,7 @@ model Conflict {
   status           ConflictResolutionState @default(OPEN)
   resolutionNotes  String?                 @db.Text
   resolvedByUserId String?
+  resolvedByUser   User?                   @relation("ConflictResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
   resolvedAt       DateTime?
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
@@ -425,6 +434,63 @@ model Conflict {
   @@index([subjectEntityId, attributeKey])
   @@index([claimAId])
   @@index([claimBId])
+}
+
+enum ReviewDecision {
+  ACCEPTED
+  REJECTED
+  EDITED
+  NEEDS_CLARIFICATION
+}
+
+enum ReviewActionType {
+  CLAIM_ACCEPTED
+  CLAIM_REJECTED
+  CLAIM_EDITED
+  CONFLICT_RESOLVED
+  ENTITIES_MERGED
+}
+
+model Review {
+  id         String         @id @default(cuid())
+  claimId    String
+  claim      Claim          @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  projectId  String
+  project    Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reviewerId String
+  reviewer   User           @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  decision   ReviewDecision
+  comments   String?        @db.Text
+  reviewedAt DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+  actions    ReviewAction[]
+
+  @@index([claimId])
+  @@index([projectId])
+  @@index([reviewerId])
+  @@index([decision])
+}
+
+model ReviewAction {
+  id          String           @id @default(cuid())
+  reviewId    String?
+  review      Review?          @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  projectId   String
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  actionType  ReviewActionType
+  targetId    String
+  targetType  String // CLAIM, CONFLICT, ENTITY
+  beforeState Json?
+  afterState  Json?
+  reason      String?          @db.Text
+  createdAt   DateTime         @default(now())
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([targetId])
+  @@index([actionType])
 }
 
 model HealthCheck {

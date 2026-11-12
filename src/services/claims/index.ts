@@ -273,5 +273,13 @@ export async function editCandidateClaimService(
     },
   });
 
+  // Re-verify new version and scan for conflicts
+  try {
+    const { verifyClaimService } = await import("@/services/verification");
+    await verifyClaimService(projectId, nextClaim.id, { userId: user.id });
+  } catch {
+    // Non-blocking: will be picked up in review queue / verify batch
+  }
+
   return nextClaim;
 }

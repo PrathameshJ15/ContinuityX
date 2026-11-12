@@ -1,0 +1,2 @@
+ALTER TYPE "ConflictResolutionState" ADD VALUE 'REQUIRES_CLARIFICATION';
+ALTER TYPE "ConflictResolutionState" ADD VALUE 'UNDER_REVIEW';
