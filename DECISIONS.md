@@ -112,6 +112,15 @@ These resolve ambiguities in the locked V3.1 documents. They add no P0-A feature
 - [2026-11-12] | Two-Way Receipt Verification & Tamper Detection (autonomous) | Verify Receipt executes two distinct checks: (1) stored snapshot canonical JSON hash vs receipt hash, and (2) live database claims reconstruction vs receipt hash. Rejected: single-sided check. | Distinguishes between direct database snapshot tampering and subsequent out-of-band updates to approved claims.
 - [2026-11-12] | Pure-JS Serverless PDF Generation via pdf-lib (autonomous) | Generates proof-carrying PDF exports directly from the immutable stored canonical snapshot with standard font embedding, multi-page layout, explicit text status labels (`[VERIFIED]`, `[WEAK_SUPPORT]`), reviewer justifications, verbatim evidence citations, and cryptographic receipt block. Rejected: headless browser / Puppeteer rendering. | Guaranteed fast, deterministic generation within serverless CPU and memory limits with zero external native binaries.
 
+---
+
+## Phase 7 Autonomous Decisions
+
+- [2026-11-13] | Deterministic Rule-Based Knowledge Loss Radar (autonomous) | Implemented pure, explainable `RadarService` evaluating 6 diagnostic rules (R1 single-person dependency / Bus factor = 1, R2 missing documentation on critical components, R3 unassigned tasks, R4 missing technology rationale, R5 open questions, R6 unresolved conflicts) reading non-rejected claims and entity graph relations. Rejected: opaque ML probability scoring or unexplainable failure predictions. | Provides transparent, auditable indicators with plain-language explanations and supporting or missing-field evidence.
+- [2026-11-13] | Audited Dismissals with Mandatory Written Rationale (autonomous) | Reviewers and Owners can dismiss alerts, but only with a mandatory non-empty written reason permanently recorded in `RadarDismissal` and `AuditLog`. Reactivation cleanly removes the dismissal. Rejected: unauthenticated or unreasoned alert hiding. | Ensures accountability when teams acknowledge architecture or documentation risks.
+- [2026-11-13] | Critical Component Identification Heuristic (autonomous) | A component is critical if: (1) explicitly marked `isCritical = true` by a reviewer, (2) targeted by a `depends_on` claim, or (3) has at least 3 claims. Merged duplicate entities are evaluated strictly under their canonical target. | Standardizes criticality criteria across the project knowledge graph.
+
+
 
 
 

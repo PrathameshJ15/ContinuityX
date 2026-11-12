@@ -11,7 +11,7 @@ Update at the end of every phase and every work session. Status comes from the r
 | 4 | Proof-Carrying Verification Engine | Done | Yes | 2026-11-12 | 4-gate verification engine, SPEC.md V3.2 9-row status table, DEV eval 15/15 matched, 148 tests pass |
 | 5 | Conflict Detection & Human Review | Done | Yes | 2026-11-12 | Conflict models, resolution engine, split-pane review, review queue, 159 tests pass |
 | 6 | Handover Generation & SHA-256 Receipt | Done | Yes | 2026-11-12 | Handover models, SHA-256 canonical receipt, pdf-lib export, tamper detection, 173 tests pass, P0-A CHECKPOINT PASSED |
-| 7 | Knowledge Loss Radar | Not started | No | | |
+| 7 | Knowledge Loss Radar | Done | Yes | 2026-11-13 | 6 diagnostic rules, audited dismissals, project overview KPI banner, 185 tests pass |
 | 8 | Continuity Intelligence | Not started | No | | |
 | 9 | Security, Testing, UI Polish, Benchmark, Release | Not started | No | | |
 
@@ -444,8 +444,74 @@ The complete P0-A flow (auth, workspaces, document intelligence, AI claim extrac
 - `GET /api/projects/[id]/handovers/[handoverId]`: `handover:view_approved` (OWNER, REVIEWER, VIEWER).
 - `GET /api/projects/[id]/handovers/[handoverId]/export`: `handover:view_approved` (OWNER, REVIEWER, VIEWER).
 - `POST /api/projects/[id]/handovers/[handoverId]/verify-receipt`: `handover:view_approved` (OWNER, REVIEWER, VIEWER).
-- VIEWER role is strictly forbidden from approving handovers (HTTP 403).
+---
+
+## Phase 7 Standard Phase Report
+
+### 1. What was built
+- **Database Model & Field:**
+  - `Entity.isCritical`: Added boolean flag (`@default(false)`) to designate critical components.
+  - `RadarDismissal` model (`id`, `projectId`, `alertKey`, `ruleId`, `reason`, `dismissedById`, `dismissedAt`). Unique on `[projectId, alertKey]`.
+  - Neon PostgreSQL migration applied: `20261112200000_init_phase7_radar`.
+- **Pure-JS Deterministic Radar Service (`src/services/radar/index.ts`):**
+  - Project-scoped diagnostic evaluation across non-rejected claims and entity graph relations.
+  - Critical component identification:
+    - `isCritical === true` OR
+    - has >= 3 non-rejected claims OR
+    - targeted by a `depends_on` claim.
+  - 6 Diagnostic Rules:
+    - **R1: Single-Person Dependency (Bus Factor = 1):** Critical component with exactly 1 distinct owner claim. (Severity: HIGH).
+    - **R2: Missing Documentation:** Critical component with no `selected_technology`, `decision`, or `rationale` claim and no cited document evidence. (Severity: HIGH).
+    - **R3: Unassigned Work Item:** Task claim marked `NOT_STARTED`, `IN_PROGRESS`, or `BLOCKED` with no assigned `owner` claim. (Severity: MEDIUM).
+    - **R4: Missing Technical Rationale:** `selected_technology` claim lacking a corresponding `rationale` claim for the same subject. (Severity: MEDIUM).
+    - **R5: Unresolved Question:** `open_question` claim remaining active and unresolved. (Severity: LOW).
+    - **R6: Inconsistency / Conflict:** Component or task participating in an active `OPEN` or `UNDER_REVIEW` conflict. (Severity: HIGH).
+  - Every alert provides: `ruleId`, `category`, plain-language explanation, affected entity, affected claims with verification status badges, supporting evidence citations OR explicit `missingFieldStatement`, and actionable `suggestedRemediation`.
+  - Audited dismissals (`dismissRadarAlertService`) requiring a mandatory written reason (logged to `AuditLog`).
+  - Reactivation (`reactivateRadarAlertService`) allowing dismissed alerts to be reopened.
+- **API Endpoints:**
+  - `GET /api/projects/[id]/radar`: Computes alerts and metrics with `?ruleId=` and `?status=` filters (OWNER, REVIEWER, VIEWER).
+  - `POST /api/projects/[id]/radar/dismiss`: Dismisses an alert with mandatory written justification (OWNER, REVIEWER).
+  - `POST /api/projects/[id]/radar/reactivate`: Reactivates a dismissed alert (OWNER, REVIEWER).
+- **UI Screen (`src/app/projects/[projectId]/radar/page.tsx`):**
+  - KPI summary bar (Total Open, High Risk, Medium, Low, Dismissed).
+  - Rule filter buttons with badge counts (R1 through R6) and Open/Dismissed toggles.
+  - Alert cards with severity styling, evidence status tags, plain-language explanations, and suggested remediations.
+  - Dismissal modal with mandatory justification textarea.
+  - Reactivate button on dismissed alerts showing who dismissed it and why.
+  - Navigation tab: Added `Knowledge Radar` tab to project workspace layout.
+- **Project Overview Integration (`src/app/projects/[projectId]/page.tsx`):**
+  - Added Knowledge Loss Radar summary card displaying open risk alerts and high-severity counts with a direct link to the Radar view.
+
+### 2. Commands run and their real results
+- `npx prisma migrate deploy`: Exit code 0 (applied migration `20261112200000_init_phase7_radar` to Neon PostgreSQL).
+- `npx prisma generate`: Exit code 0 (Prisma Client regenerated with `isCritical` and `RadarDismissal`).
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm test`: Exit code 0 (185 tests passed across 22 test suites, including 7 diagnostic rule tests and 5 service integration tests).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm run build`: Exit code 0 (all 49 Next.js routes compiled cleanly).
+
+### 3. Exit-criteria checklist
+- [x] Each rule has a fixture that triggers it and a fixture that does not — **PASS**
+- [x] Alerts always include an explanation and either evidence or a missing-field statement — **PASS**
+- [x] Edge cases: empty project (0 alerts), only rejected claims (0 alerts), merged entities counted once — **PASS**
+- [x] Dismissal requires a written justification and is audited — **PASS**
+- [x] Radar alert counts are surfaced on the project overview page — **PASS**
+- [x] typecheck, lint, tests and build pass — **PASS**
+
+### 4. Deviations and DECISIONS.md entries
+- Added 3 Phase 7 entries in `DECISIONS.md`:
+  - `[2026-11-13] | Deterministic Rule-Based Knowledge Loss Radar`
+  - `[2026-11-13] | Audited Dismissals with Mandatory Written Rationale`
+  - `[2026-11-13] | Critical Component Identification Heuristic`
+
+### 5. Security confirmation: Radar routes enforcement
+- `GET /api/projects/[id]/radar`: `project:read` (OWNER, REVIEWER, VIEWER).
+- `POST /api/projects/[id]/radar/dismiss`: `review:claims_conflicts_entities` (OWNER, REVIEWER).
+- `POST /api/projects/[id]/radar/reactivate`: `review:claims_conflicts_entities` (OWNER, REVIEWER).
+- VIEWER role is blocked from dismissing or reactivating alerts (HTTP 403).
 - Non-members receive HTTP 404 Not Found (no project enumeration).
+
 
 
 

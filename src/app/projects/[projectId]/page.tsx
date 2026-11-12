@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react";
+import Link from "next/link";
 import {
   Calendar,
   User,
@@ -13,6 +14,8 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  Radar,
+  ArrowRight,
 } from "lucide-react";
 
 interface ProjectData {
@@ -54,6 +57,7 @@ export default function ProjectOverviewPage({
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [saving, setSaving] = useState(false);
+  const [radarCount, setRadarCount] = useState<{ open: number; high: number } | null>(null);
 
   const loadProject = useCallback(async () => {
     setLoading(true);
@@ -67,6 +71,20 @@ export default function ProjectOverviewPage({
       setProject(data.data);
       setEditName(data.data.name);
       setEditDesc(data.data.description || "");
+
+      // Load radar counts
+      try {
+        const radarRes = await fetch(`/api/projects/${projectId}/radar?status=OPEN`);
+        const radarJson = await radarRes.json();
+        if (radarRes.ok && radarJson.data?.metrics) {
+          setRadarCount({
+            open: radarJson.data.metrics.totalOpen,
+            high: radarJson.data.metrics.bySeverity.HIGH,
+          });
+        }
+      } catch {
+        // Radar metric load is best-effort
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error loading project");
     } finally {
@@ -295,6 +313,37 @@ export default function ProjectOverviewPage({
           </div>
         </div>
       </div>
+
+      {/* Knowledge Loss Radar Indicator Banner */}
+      {radarCount && (
+        <div className="rounded-xl border bg-card p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-amber-500/10 p-2.5 text-amber-600 dark:text-amber-400">
+              <Radar className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="font-semibold text-sm text-foreground flex items-center gap-2">
+                Knowledge Loss Radar: {radarCount.open} Open Risk Alert{radarCount.open !== 1 ? "s" : ""}
+                {radarCount.high > 0 && (
+                  <span className="rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 px-2 py-0.5 text-xs font-semibold">
+                    {radarCount.high} High Risk
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Rule-based checks monitoring single-person dependencies, missing rationale, and unassigned work.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href={`/projects/${projectId}/radar`}
+            className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted shadow-sm transition-colors shrink-0"
+          >
+            Open Radar <ArrowRight className="h-3.5 w-3.5 text-primary" />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

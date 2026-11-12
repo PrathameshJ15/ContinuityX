@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Award,
   CheckSquare,
+  Radar,
 } from "lucide-react";
 
 interface ProjectDetails {
@@ -146,6 +147,12 @@ export default function ProjectWorkspaceLayout({
       href: `/projects/${projectId}/handover`,
       icon: Award,
       active: pathname.startsWith(`/projects/${projectId}/handover`),
+    },
+    {
+      name: "Knowledge Radar",
+      href: `/projects/${projectId}/radar`,
+      icon: Radar,
+      active: pathname.startsWith(`/projects/${projectId}/radar`),
     },
     {
       name: "Entities",

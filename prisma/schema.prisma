@@ -147,6 +147,7 @@ model User {
   resolvedConflicts Conflict[]        @relation("ConflictResolver")
   handoversApproved Handover[]        @relation("HandoverApprover")
   handoverReceipts  HandoverReceipt[]
+  radarDismissals   RadarDismissal[]
 
   @@index([email])
 }
@@ -170,6 +171,7 @@ model Project {
   reviews        Review[]
   reviewActions  ReviewAction[]
   handovers      Handover[]
+  radarDismissals RadarDismissal[]
 
   @@index([createdBy])
   @@index([status])
@@ -310,6 +312,7 @@ model Entity {
   mergedInto     Entity?       @relation("EntityMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
   mergedEntities Entity[]      @relation("EntityMerge")
   needsReview    Boolean       @default(false)
+  isCritical     Boolean       @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   aliases        EntityAlias[]
@@ -556,4 +559,20 @@ model HandoverReceipt {
   @@index([handoverId])
   @@index([snapshotHash])
   @@index([version])
+}
+
+model RadarDismissal {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  alertKey      String
+  ruleId        String
+  reason        String   @db.Text
+  dismissedById String
+  dismissedBy   User     @relation(fields: [dismissedById], references: [id], onDelete: Restrict)
+  dismissedAt   DateTime @default(now())
+
+  @@unique([projectId, alertKey])
+  @@index([projectId])
+  @@index([ruleId])
 }
