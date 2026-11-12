@@ -15,6 +15,7 @@ import {
   AlertOctagon,
   AlertTriangle,
   Award,
+  BrainCircuit,
   CheckSquare,
   Radar,
 } from "lucide-react";
@@ -153,6 +154,12 @@ export default function ProjectWorkspaceLayout({
       href: `/projects/${projectId}/radar`,
       icon: Radar,
       active: pathname.startsWith(`/projects/${projectId}/radar`),
+    },
+    {
+      name: "Intelligence & Q&A",
+      href: `/projects/${projectId}/intelligence`,
+      icon: BrainCircuit,
+      active: pathname.startsWith(`/projects/${projectId}/intelligence`),
     },
     {
       name: "Entities",

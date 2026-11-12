@@ -12,7 +12,7 @@ Update at the end of every phase and every work session. Status comes from the r
 | 5 | Conflict Detection & Human Review | Done | Yes | 2026-11-12 | Conflict models, resolution engine, split-pane review, review queue, 159 tests pass |
 | 6 | Handover Generation & SHA-256 Receipt | Done | Yes | 2026-11-12 | Handover models, SHA-256 canonical receipt, pdf-lib export, tamper detection, 173 tests pass, P0-A CHECKPOINT PASSED |
 | 7 | Knowledge Loss Radar | Done | Yes | 2026-11-13 | 6 diagnostic rules, audited dismissals, project overview KPI banner, 185 tests pass |
-| 8 | Continuity Intelligence | Not started | No | | |
+| 8 | Continuity Intelligence | Done | Yes | 2026-11-13 | Continuity Score, Bus Factor map, hardened Q&A refusal, 196 tests pass |
 | 9 | Security, Testing, UI Polish, Benchmark, Release | Not started | No | | |
 
 Status values: Not started, In progress, Done (exit test passed), Blocked.
@@ -510,11 +510,61 @@ The complete P0-A flow (auth, workspaces, document intelligence, AI claim extrac
 - `POST /api/projects/[id]/radar/dismiss`: `review:claims_conflicts_entities` (OWNER, REVIEWER).
 - `POST /api/projects/[id]/radar/reactivate`: `review:claims_conflicts_entities` (OWNER, REVIEWER).
 - VIEWER role is blocked from dismissing or reactivating alerts (HTTP 403).
+- Non-members receive HTTP 404 Not Found (no project enumeration).---
+
+## Phase 8 Standard Phase Report
+
+### 1. What was built
+- **Continuity Score Service (`src/services/intelligence/score.ts`):**
+  - Evaluates 5 weighted continuity dimensions:
+    - Documentation (Weight 25): Verified claims with source document & excerpt / all non-rejected claims.
+    - Decision Traceability (Weight 20): Architectural decisions with rationale / all decisions.
+    - Ownership Coverage (Weight 20): Tasks with assigned owner / all tasks.
+    - Dependency Clarity (Weight 15): Components with documented dependencies / all critical components.
+    - Handover Readiness (Weight 20): Ratio of accepted claims minus penalty for open unresolved conflicts (-10 per conflict).
+  - Honest Coverage Rule: Excludes metrics with denominator = 0 from numerator and denominator (does not penalize missing data as 0).
+  - Minimum Evidence Threshold: If available weight sum is < 60%, score is set to `null` with status `INSUFFICIENT_EVIDENCE`.
+  - Component-level Bus Factor Map: Identifies modules, their assigned owners, and single-person failure risks.
+- **Hardened Handover Q&A Service (`src/services/intelligence/qa.ts`):**
+  - Queries ONLY approved claims (`reviewState: ACCEPTED | EDITED`).
+  - Stage 1: Deterministic retrieval matching entities, aliases, and attribute keywords.
+  - Invariant 1: If 0 claims match or no approved claims exist, immediately returns `FIXED_REFUSAL_MESSAGE` with `modelCalled: false`.
+  - Stage 2: Encloses retrieved claims in `<untrusted_approved_claims>` tags and prompts Gemini model with temperature 0 for JSON schema `{ answer, citedClaimIds, supported }`.
+  - Invariant 2: Server-side validation verifies every cited claim ID is an exact member of the retrieved set. If ungrounded or unsupported, returns `FIXED_REFUSAL_MESSAGE`.
+- **API Endpoints:**
+  - `GET /api/projects/[id]/intelligence`: Returns Continuity Score, metric breakdown, and Bus Factor map (OWNER, REVIEWER, VIEWER).
+  - `POST /api/projects/[id]/qa`: Hardened handover Q&A endpoint with cited claims verification (OWNER, REVIEWER, VIEWER).
+- **UI Screen (`src/app/projects/[projectId]/intelligence/page.tsx`):**
+  - Tabbed interface: "Continuity Score & Metrics", "Bus Factor Map", and "Handover Q&A".
+  - Score card with color-coded gauge (Low, Medium, Good, High Readiness) and detailed dimension progress bars with formulas and explanations.
+  - Bus factor cards highlighting single-owner risks vs. multi-owner distribution with component badges.
+  - Conversational Q&A chat with quick suggested questions, refusal guardrail indicators, and verified citation pills linking directly to source documents and evidence status.
+- **Workspace Layout Integration (`src/app/projects/[projectId]/layout.tsx`):**
+  - Added `Intelligence & Q&A` navigation tab with BrainCircuit icon.
+- **Tests Added:**
+  - `tests/unit/continuity-score.test.ts` (4 unit tests): Honest missing-metric exclusion, <60% insufficient evidence threshold, exactly 60% threshold score computation, bus factor map single-owner detection.
+  - `tests/integration/qa-service.test.ts` (7 integration tests): Immediate refusal when 0 claims match without model call, only approved claims retrieved, refusal on hallucinated citation ID, refusal on supported=false, successful answers with verified citations, VIEWER permission check, non-member 404 security check.
+
+### 2. Commands run and their real results
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm test`: Exit code 0 (196 tests passing across 24 test suites).
+- `npm run build`: Exit code 0 (all 51 Next.js routes compiled cleanly).
+- Server verified: High-speed production server running at `http://localhost:3000`.
+
+### 3. Exit-criteria checklist
+- [x] Missing metrics are excluded from denominator rather than treated as 0 — **PASS**
+- [x] Insufficient evidence threshold (<60% coverage) displays INSUFFICIENT_EVIDENCE — **PASS**
+- [x] Q&A returns exact refusal without calling model when nothing retrieved — **PASS**
+- [x] Server validates every cited claim ID was in the retrieved set — **PASS**
+- [x] Bus factor map surfaces single-owner components — **PASS**
+- [x] typecheck, lint, tests and build pass — **PASS**
+
+### 4. Security confirmation: Intelligence & Q&A authorization
+- `GET /api/projects/[id]/intelligence`: `project:read` (OWNER, REVIEWER, VIEWER).
+- `POST /api/projects/[id]/qa`: `qa:ask_approved` (OWNER, REVIEWER, VIEWER).
 - Non-members receive HTTP 404 Not Found (no project enumeration).
-
-
-
-
+- Q&A never exposes unapproved or rejected candidate claims.
 
 
 
