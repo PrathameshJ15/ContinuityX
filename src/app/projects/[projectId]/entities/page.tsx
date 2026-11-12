@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react";
+import { z } from "zod";
 import {
   AlertCircle,
   AlertTriangle,
@@ -98,6 +99,35 @@ export default function EntitiesPage({
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault();
     if (!editing) return;
+
+    const entityNameSchema = z
+      .string()
+      .trim()
+      .min(2, "Entity name must be at least 2 characters.")
+      .regex(/[a-zA-Z]/, "Entity name must contain at least one letter.");
+
+    const parsed = entityNameSchema.safeParse(editName);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || "Invalid entity name");
+      return;
+    }
+
+    const trimmedEdit = parsed.data;
+    const normalizedEdit = trimmedEdit
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const collision = entities.find(
+      (ent) => ent.normalizedId === normalizedEdit && ent.id !== editing.id
+    );
+    if (collision) {
+      setError(`An entity with normalized name '${normalizedEdit}' already exists in this project ('${collision.canonicalName}').`);
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -110,7 +140,7 @@ export default function EntitiesPage({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          canonicalName: editName,
+          canonicalName: trimmedEdit,
           type: editType,
           aliases,
           needsReview: editNeedsReview,
@@ -161,6 +191,33 @@ export default function EntitiesPage({
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+
+    const entityNameSchema = z
+      .string()
+      .trim()
+      .min(2, "Entity name must be at least 2 characters.")
+      .regex(/[a-zA-Z]/, "Entity name must contain at least one letter.");
+
+    const parsed = entityNameSchema.safeParse(newName);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message || "Invalid entity name");
+      return;
+    }
+
+    const trimmedNew = parsed.data;
+    const normalizedNew = trimmedNew
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const collision = entities.find((ent) => ent.normalizedId === normalizedNew);
+    if (collision) {
+      setError(`An entity with normalized name '${normalizedNew}' already exists in this project ('${collision.canonicalName}').`);
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -173,7 +230,7 @@ export default function EntitiesPage({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          canonicalName: newName,
+          canonicalName: trimmedNew,
           type: newType,
           aliases,
         }),

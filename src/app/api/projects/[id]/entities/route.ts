@@ -1,16 +1,9 @@
 import { NextRequest } from "next/server";
-import { z } from "zod";
-import { EntityType } from "@prisma/client";
 import { listEntitiesService, createManualEntityService } from "@/services/entities";
+import { createEntitySchema } from "@/services/entities/schema";
 import { jsonSuccess, jsonError, handleApiError } from "@/lib/api-response";
 
 export const dynamic = "force-dynamic";
-
-const createEntitySchema = z.object({
-  canonicalName: z.string().min(1).max(200),
-  type: z.nativeEnum(EntityType),
-  aliases: z.array(z.string().min(1).max(200)).max(25).optional(),
-});
 
 export async function GET(
   req: NextRequest,

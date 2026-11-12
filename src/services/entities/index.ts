@@ -77,6 +77,14 @@ export async function updateEntityService(
   }
 
   const nextName = input.canonicalName?.replace(/\s+/g, " ").trim();
+  if (nextName !== undefined) {
+    if (nextName.length < 2) {
+      throw new AppError("VALIDATION_ERROR", "Entity name must be at least 2 characters.", 400);
+    }
+    if (!/[a-zA-Z]/.test(nextName)) {
+      throw new AppError("VALIDATION_ERROR", "Entity name must contain at least one letter.", 400);
+    }
+  }
   const nextNormalizedId = nextName ? normalizeEntityKey(nextName) : undefined;
 
   if (nextNormalizedId && nextNormalizedId !== existing.normalizedId) {
@@ -278,6 +286,12 @@ export async function createManualEntityService(
   );
 
   const cleanName = input.canonicalName.replace(/\s+/g, " ").trim();
+  if (cleanName.length < 2) {
+    throw new AppError("VALIDATION_ERROR", "Entity name must be at least 2 characters.", 400);
+  }
+  if (!/[a-zA-Z]/.test(cleanName)) {
+    throw new AppError("VALIDATION_ERROR", "Entity name must contain at least one letter.", 400);
+  }
   const normalizedId = normalizeEntityKey(cleanName);
   if (!cleanName || !normalizedId) {
     throw new AppError("VALIDATION_ERROR", "Entity name cannot be empty.", 400);
@@ -289,7 +303,7 @@ export async function createManualEntityService(
   if (collision) {
     throw new AppError(
       "CONFLICT",
-      `Entity '${collision.canonicalName}' already exists in this project.`,
+      `Entity '${collision.canonicalName}' with normalized key '${normalizedId}' already exists in this project.`,
       409
     );
   }

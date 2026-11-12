@@ -1,19 +1,23 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EntityCreator, EntityType, ProjectRole } from "@prisma/client";
+import { prisma } from "@/lib/db";
 import {
   normalizeEntityKey,
   computeEntitySimilarity,
   isAmbiguousPersonMention,
   resolveSubjectEntity,
 } from "@/services/entities/resolution";
-import { mergeEntitiesService, updateEntityService } from "@/services/entities";
+import { mergeEntitiesService, updateEntityService, createManualEntityService } from "@/services/entities";
+import { createEntitySchema } from "@/services/entities/schema";
+import { AppError } from "@/lib/api-response";
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     $transaction: vi.fn(),
+    user: { findUnique: vi.fn() },
     projectMember: { findUnique: vi.fn() },
-    entity: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), findUniqueOrThrow: vi.fn() },
+    entity: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), findUniqueOrThrow: vi.fn(), create: vi.fn() },
     entityAlias: { deleteMany: vi.fn(), createMany: vi.fn(), create: vi.fn(), upsert: vi.fn() },
     claim: { updateMany: vi.fn() },
     auditLog: { create: vi.fn() },
@@ -279,5 +283,93 @@ describe("Phase 3 Entity Resolution, Ambiguity Guard & Reviewer Merging", () => 
     });
     expect(edited.needsReview).toBe(false);
     expect(edited.aliases.map((a) => a.alias)).toContain("SSO Core");
+  });
+
+  describe("Entity Creation Validation (Item 4)", () => {
+    it("rejects purely numeric names like '12345678' via Zod schema", () => {
+      const result = createEntitySchema.safeParse({
+        canonicalName: "12345678",
+        type: EntityType.SYSTEM,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain("must contain at least one letter");
+      }
+    });
+
+    it("rejects names shorter than 2 characters via Zod schema", () => {
+      const result = createEntitySchema.safeParse({
+        canonicalName: "A",
+        type: EntityType.COMPONENT,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain("at least 2 characters");
+      }
+    });
+
+    it("accepts valid trimmed names containing letters", () => {
+      const result = createEntitySchema.safeParse({
+        canonicalName: "  Auth Module V2  ",
+        type: EntityType.COMPONENT,
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.canonicalName).toBe("Auth Module V2");
+      }
+    });
+
+    it("throws VALIDATION_ERROR in createManualEntityService for pure numeric names", async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: "u-1",
+        name: "Alice",
+        email: "alice@example.com",
+      } as never);
+      vi.mocked(prisma.projectMember.findUnique).mockResolvedValue({
+        id: "pm-1",
+        projectId: "proj-1",
+        userId: "u-1",
+        role: ProjectRole.REVIEWER,
+        project: { id: "proj-1", status: "ACTIVE" },
+      } as never);
+
+      await expect(
+        createManualEntityService(
+          "proj-1",
+          { canonicalName: "12345678", type: EntityType.SYSTEM },
+          "u-1"
+        )
+      ).rejects.toThrow(AppError);
+    });
+
+    it("throws CONFLICT in createManualEntityService when duplicate normalized name exists", async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: "u-1",
+        name: "Alice",
+        email: "alice@example.com",
+      } as never);
+      vi.mocked(prisma.projectMember.findUnique).mockResolvedValue({
+        id: "pm-1",
+        projectId: "proj-1",
+        userId: "u-1",
+        role: ProjectRole.REVIEWER,
+        project: { id: "proj-1", status: "ACTIVE" },
+      } as never);
+
+      vi.mocked(prisma.entity.findFirst).mockResolvedValue({
+        id: "ent-auth",
+        canonicalName: "Auth Engine",
+        normalizedId: "auth engine",
+        projectId: "proj-1",
+      } as never);
+
+      await expect(
+        createManualEntityService(
+          "proj-1",
+          { canonicalName: "auth-engine", type: EntityType.COMPONENT },
+          "u-1"
+        )
+      ).rejects.toThrow("already exists in this project");
+    });
   });
 });
