@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDate } from "@/lib/date";
+import { formatRoleLabel, getRoleBadgeClass } from "@/lib/roles";
 import {
   ShieldCheck,
   Plus,
@@ -124,17 +125,6 @@ export default function DashboardPage() {
     }
   }
 
-  function getRoleBadgeClass(role: string) {
-    switch (role) {
-      case "OWNER":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 border-purple-300";
-      case "REVIEWER":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300";
-      default:
-        return "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-300";
-    }
-  }
-
   return (
     <div className="flex min-h-screen flex-col bg-muted/10">
       <header className="border-b bg-card sticky top-0 z-10">
@@ -233,7 +223,7 @@ export default function DashboardPage() {
                         proj.role
                       )}`}
                     >
-                      {proj.role}
+                      {formatRoleLabel(proj.role)}
                     </span>
                     {proj.status === "ARCHIVED" && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">

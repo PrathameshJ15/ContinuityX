@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatRoleLabel } from "@/lib/roles";
 import { ShieldCheck, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 
 export default function LoginPage() {
@@ -135,7 +136,7 @@ export default function LoginPage() {
             className="rounded border border-input bg-background p-2 text-left hover:bg-accent hover:text-accent-foreground transition-colors"
           >
             <div className="font-semibold">Arjun Mehta</div>
-            <div className="text-muted-foreground">Lead / Owner</div>
+            <div className="text-muted-foreground">{formatRoleLabel("OWNER")}</div>
           </button>
           <button
             type="button"
@@ -143,7 +144,7 @@ export default function LoginPage() {
             className="rounded border border-input bg-background p-2 text-left hover:bg-accent hover:text-accent-foreground transition-colors"
           >
             <div className="font-semibold">Riya Sharma</div>
-            <div className="text-muted-foreground">Reviewer</div>
+            <div className="text-muted-foreground">{formatRoleLabel("REVIEWER")}</div>
           </button>
         </div>
 

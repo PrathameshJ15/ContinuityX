@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { formatRoleLabel, getRoleBadgeClass } from "@/lib/roles";
 import {
   ShieldCheck,
   ArrowLeft,
@@ -204,15 +205,11 @@ export default function ProjectWorkspaceLayout({
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground hidden sm:inline">Your Role:</span>
             <span
-              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
-                project.currentUserRole === "OWNER"
-                  ? "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 border-purple-300"
-                  : project.currentUserRole === "REVIEWER"
-                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300"
-                  : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-300"
-              }`}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold border ${getRoleBadgeClass(
+                project.currentUserRole
+              )}`}
             >
-              {project.currentUserRole}
+              {formatRoleLabel(project.currentUserRole)}
             </span>
           </div>
         </div>

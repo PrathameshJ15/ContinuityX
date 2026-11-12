@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use, useCallback } from "react";
 import { formatDate } from "@/lib/date";
+import { formatRoleLabel, getRoleBadgeClass } from "@/lib/roles";
 import {
   UserPlus,
   Shield,
@@ -229,9 +230,9 @@ export default function MembersPage({
                 onChange={(e) => setRole(e.target.value as "OWNER" | "REVIEWER" | "VIEWER")}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                <option value="VIEWER">VIEWER</option>
-                <option value="REVIEWER">REVIEWER</option>
-                <option value="OWNER">OWNER</option>
+                <option value="VIEWER">{formatRoleLabel("VIEWER")}</option>
+                <option value="REVIEWER">{formatRoleLabel("REVIEWER")}</option>
+                <option value="OWNER">{formatRoleLabel("OWNER")}</option>
               </select>
             </div>
 
@@ -298,9 +299,9 @@ export default function MembersPage({
                             }
                             className="rounded border border-input bg-background px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                           >
-                            <option value="OWNER">OWNER</option>
-                            <option value="REVIEWER">REVIEWER</option>
-                            <option value="VIEWER">VIEWER</option>
+                            <option value="OWNER">{formatRoleLabel("OWNER")}</option>
+                            <option value="REVIEWER">{formatRoleLabel("REVIEWER")}</option>
+                            <option value="VIEWER">{formatRoleLabel("VIEWER")}</option>
                           </select>
                           {isMemberLastOwner && (
                             <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
@@ -310,15 +311,11 @@ export default function MembersPage({
                         </div>
                       ) : (
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${
-                            member.role === "OWNER"
-                              ? "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 border-purple-300"
-                              : member.role === "REVIEWER"
-                              ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300"
-                              : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-300"
-                          }`}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getRoleBadgeClass(
+                            member.role
+                          )}`}
                         >
-                          {member.role}
+                          {formatRoleLabel(member.role)}
                         </span>
                       )}
                     </td>
