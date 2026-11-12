@@ -14,6 +14,7 @@ Update at the end of every phase and every work session. Status comes from the r
 | 7 | Knowledge Loss Radar | Done | Yes | 2026-11-13 | 6 diagnostic rules, audited dismissals, project overview KPI banner, 185 tests pass |
 | 8 | Continuity Intelligence | Done | Yes | 2026-11-13 | Continuity Score, Bus Factor map, hardened Q&A refusal, 196 tests pass |
 | 9 | Security, Testing, UI Polish, Benchmark, Release | Done | Yes | 2026-11-13 | Security isolation, TEST held-out suite, benchmark 40 claims, v1.0.0 released |
+| - | Post-Release Small Fix Task (Items 1–7) | Done | Yes | 2026-11-13 | 7 small fixes applied across empty states, QA timeout, role display, entity zod, filters, dates, cleanup |
 
 Status values: Not started, In progress, Done (exit test passed), Blocked.
 
@@ -76,6 +77,44 @@ Status values: Not started, In progress, Done (exit test passed), Blocked.
 
 ### 4. Milestone Checkpoint: v1.0.0 Release Complete
 - All 10 phases (0 through 9) are 100% complete, verified, and passing all acceptance tests.
+
+---
+
+## Post-Release Small Fix Task (Items 1–7)
+
+### 1. What was built & delivered
+- **Item 1: Empty States (`3674916`):**
+  - Updated Knowledge Radar, Evidence Review, Bus Factor, and Conflicts to distinguish projects with no data from "checked and nothing found".
+  - Empty states now explicitly guide the user with: *"No claims yet. Upload documents and run extraction first"* and provide a direct link to the documents page.
+  - Integration test added in `tests/integration/radar-service.test.ts`.
+- **Item 2: Handover Q&A Hardening (`032abae`):**
+  - Added 30-second client timeout (`AbortSignal`) to prevent indefinite spinning.
+  - Added inline error state with an instant **"Retry Question"** button in the chat thread.
+  - Refusal indicator badge added to highlight when queries cannot be answered from approved evidence.
+- **Item 3: Role & Identity Display (`1dffdb6`):**
+  - Resolved root cause in `prisma/seed.ts`: Cleaned seeded display names to remove parenthetical role suffixes ("Riya Sharma", "Arjun Mehta").
+  - Enforced deterministic upsert of project memberships in seed script so Riya is guaranteed `REVIEWER` role on demo project.
+- **Item 4: Entity Name Zod Validation (`58f7617`):**
+  - Added shared schema `src/services/entities/schema.ts` validating: trimmed, minimum 2 characters, must contain at least one letter, maximum 200 characters.
+  - Server rejects pure numbers (e.g., "12345678") with HTTP 400 `VALIDATION_ERROR` and rejects duplicates with HTTP 409 `CONFLICT`.
+  - Client modal enforces the same Zod schema before dispatching requests.
+  - Unit tests added in `tests/unit/entity-resolution.test.ts`.
+- **Item 5: Default Filters (`45dde38`):**
+  - Aligned API and UI defaults for Radar and Conflicts so open items are displayed by default and never obscured.
+- **Item 6: Unambiguous Shared Date Formatter (`0a979fc`):**
+  - Created shared date utility `src/lib/date.ts` formatting all dates deterministically as `12 Nov 2026`.
+  - Replaced all 10 occurrences of `toLocaleDateString()` across `dashboard`, `projects`, `claims`, `conflicts`, `documents`, `handover`, `members`, `radar`, and `review`.
+  - Unit tests added in `tests/unit/date-formatter.test.ts`.
+- **Item 7: Test Data Cleanup (`83486db`):**
+  - Executed safe cleanup script `scripts/cleanup_test_data.ts` deleting temporary project `"DEV Phase 3 Live Check (Temp)"` and invalid entity `"12345678"`.
+  - Verified remaining database state: only legitimate `"Smart Attendance System (Synthetic Demo)"` project remains.
+
+### 2. Verification Summary
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm test`: Exit code 0 (220 tests passed across 27 test suites).
+- `npm run build`: Exit code 0 (all 51 routes compiled and statically optimized).
+- Live server verified: `http://localhost:3000` (database connected, latency healthy).
 ## Open questions
 
 (none yet)
@@ -661,4 +700,42 @@ The complete P0-A flow (auth, workspaces, document intelligence, AI claim extrac
 
 ### 4. Milestone Checkpoint: v1.0.0 Release Complete
 - All 10 phases (0 through 9) are 100% complete, verified, and passing all acceptance tests.
+
+---
+
+## Post-Release Small Fix Task (Items 1–7)
+
+### 1. What was built & delivered
+- **Item 1: Empty States (`3674916`):**
+  - Updated Knowledge Radar, Evidence Review, Bus Factor, and Conflicts to distinguish projects with no data from "checked and nothing found".
+  - Empty states now explicitly guide the user with: *"No claims yet. Upload documents and run extraction first"* and provide a direct link to the documents page.
+  - Integration test added in `tests/integration/radar-service.test.ts`.
+- **Item 2: Handover Q&A Hardening (`032abae`):**
+  - Added 30-second client timeout (`AbortSignal`) to prevent indefinite spinning.
+  - Added inline error state with an instant **"Retry Question"** button in the chat thread.
+  - Refusal indicator badge added to highlight when queries cannot be answered from approved evidence.
+- **Item 3: Role & Identity Display (`1dffdb6`):**
+  - Resolved root cause in `prisma/seed.ts`: Cleaned seeded display names to remove parenthetical role suffixes ("Riya Sharma", "Arjun Mehta").
+  - Enforced deterministic upsert of project memberships in seed script so Riya is guaranteed `REVIEWER` role on demo project.
+- **Item 4: Entity Name Zod Validation (`58f7617`):**
+  - Added shared schema `src/services/entities/schema.ts` validating: trimmed, minimum 2 characters, must contain at least one letter, maximum 200 characters.
+  - Server rejects pure numbers (e.g., "12345678") with HTTP 400 `VALIDATION_ERROR` and rejects duplicates with HTTP 409 `CONFLICT`.
+  - Client modal enforces the same Zod schema before dispatching requests.
+  - Unit tests added in `tests/unit/entity-resolution.test.ts`.
+- **Item 5: Default Filters (`45dde38`):**
+  - Aligned API and UI defaults for Radar and Conflicts so open items are displayed by default and never obscured.
+- **Item 6: Unambiguous Shared Date Formatter (`0a979fc`):**
+  - Created shared date utility `src/lib/date.ts` formatting all dates deterministically as `12 Nov 2026`.
+  - Replaced all 10 occurrences of `toLocaleDateString()` across `dashboard`, `projects`, `claims`, `conflicts`, `documents`, `handover`, `members`, `radar`, and `review`.
+  - Unit tests added in `tests/unit/date-formatter.test.ts`.
+- **Item 7: Test Data Cleanup (`83486db`):**
+  - Executed safe cleanup script `scripts/cleanup_test_data.ts` deleting temporary project `"DEV Phase 3 Live Check (Temp)"` and invalid entity `"12345678"`.
+  - Verified remaining database state: only legitimate `"Smart Attendance System (Synthetic Demo)"` project remains.
+
+### 2. Verification Summary
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm test`: Exit code 0 (220 tests passed across 27 test suites).
+- `npm run build`: Exit code 0 (all 51 routes compiled and statically optimized).
+- Live server verified: `http://localhost:3000` (database connected, latency healthy).
 
