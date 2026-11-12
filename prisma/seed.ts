@@ -12,11 +12,11 @@ async function main() {
   const userLead = await prisma.user.upsert({
     where: { email: "lead@continuityx.demo" },
     update: {
-      name: "Arjun Mehta (Lead)",
+      name: "Arjun Mehta",
       passwordHash,
     },
     create: {
-      name: "Arjun Mehta (Lead)",
+      name: "Arjun Mehta",
       email: "lead@continuityx.demo",
       passwordHash,
     },
@@ -26,11 +26,11 @@ async function main() {
   const userMember = await prisma.user.upsert({
     where: { email: "member@continuityx.demo" },
     update: {
-      name: "Riya Sharma (Engineer)",
+      name: "Riya Sharma",
       passwordHash,
     },
     create: {
-      name: "Riya Sharma (Engineer)",
+      name: "Riya Sharma",
       email: "member@continuityx.demo",
       passwordHash,
     },
@@ -73,6 +73,23 @@ async function main() {
   } else {
     console.log(`[Seed] Synthetic demo project already exists: ${project.id}`);
   }
+
+  // Ensure membership roles are strictly synced with the demo specification
+  await prisma.projectMember.upsert({
+    where: {
+      projectId_userId: { projectId: project.id, userId: userLead.id },
+    },
+    update: { role: ProjectRole.OWNER },
+    create: { projectId: project.id, userId: userLead.id, role: ProjectRole.OWNER },
+  });
+
+  await prisma.projectMember.upsert({
+    where: {
+      projectId_userId: { projectId: project.id, userId: userMember.id },
+    },
+    update: { role: ProjectRole.REVIEWER },
+    create: { projectId: project.id, userId: userMember.id, role: ProjectRole.REVIEWER },
+  });
 
   console.log("[Seed] Synthetic demo seeding completed successfully.");
 }
