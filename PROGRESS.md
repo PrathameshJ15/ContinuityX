@@ -27,7 +27,22 @@ Status values: Not started, In progress, Done (exit test passed), Blocked.
 - **Testing:** Vitest 2.1, jsdom, `@testing-library/react` for 100% offline hermetic unit tests
 - **CI:** GitHub Actions (`.github/workflows/ci.yml`) checking install, prisma generate, lint, typecheck, tests, and build
 - **Core Routes:** `/` (landing page), `/login` (auth placeholder), `/api/health` (database connectivity check with sanitized error responses)
-- **Phase 0 Decisions:** 5 autonomous decisions recorded in `DECISIONS.md` (Auth.js credentials, pluggable storage provider, pdf-lib, step-wise state machine, Gemini tiered models)---
+- **Phase 0 Decisions:** 5 autonomous decisions recorded in `DECISIONS.md` (Auth.js credentials, pluggable storage provider, pdf-lib, step-wise state machine, Gemini tiered models)
+
+---
+
+## Fix Pack: Stability & Trust Fixes (Items 1–7)
+
+### 1. Fix Summary & Engineering Safeguards
+- **Item 1 (Empty States):** Separated "No data yet" (`totalClaims === 0`: "No claims yet. Upload documents and run extraction first", with link to documents) from evaluated zero-risk states across Knowledge Radar, Evidence Review Queue, Bus Factor Map, and Conflicts. Added `src/lib/empty-states.ts` and unit tests in `tests/unit/empty-states.test.ts`. Commit: `8744415`.
+- **Item 2 (Handover Q&A Timeout & Refusal):** Added 25-second server-side timeout (`Promise.race`) in `src/services/intelligence/qa.ts` and 30-second client-side timeout (`AbortController`) with Retry buttons. Verified model is not called when 0 claims are retrieved (`modelCalled: false`). Added test in `tests/integration/qa-service.test.ts`. Commit: `91dcc6d`.
+- **Item 3 (Role Display Consistency):** Created unified role label and badge formatter `src/lib/roles.ts` (`formatRoleLabel`, `getRoleBadgeClass`). Replaced divergent role displays across login page, dashboard project cards, workspace header, and team access list. Added unit test in `tests/unit/roles.test.ts`. Commit: `32516c4`.
+- **Item 4 (Entity & Alias Zod Schema):** Created shared Zod validation `src/services/entities/schema.ts` (`entityNameSchema`, `entityAliasSchema`, `createEntitySchema`). Requires trimmed, min 2 chars, at least one letter, max 200 chars, strictly plain text (`^[^<>]+$`), rejecting numeric names like "12345678", whitespace, and duplicate normalized names or aliases within the same project. Added 14 unit tests in `tests/unit/entity-resolution.test.ts`. Commit: `b464227`.
+- **Item 5 (Default Filters & Date Formatter):** Defaulted filters to ALL/OPEN, added live counts next to each filter option in Conflicts (`countsByStatus`) and Radar (`metrics`). Enhanced `src/lib/date.ts` (`formatDate` outputs "12 Nov 2026", `formatDateTime` outputs "12 Nov 2026, 14:30:00 UTC" in 24-hour time with timezone). Added tests in `tests/unit/date-formatter.test.ts`. Commit: `4fbc051`.
+- **Item 6 (Safe Test Data Cleanup):** Created idempotent cleanup script `scripts/cleanup_test_data.ts` with Neon snapshot safeguards, safely removing temporary DEV test projects ("DEV Phase 3*") and invalid entity "12345678" while preserving the seeded demo project "Smart Attendance System (Synthetic Demo)" and demo user accounts. Commit: `83486db`.
+- **Item 7 (Gemini Free Tier Data Policy):** Recorded autonomous decision in `DECISIONS.md` defining strict synthetic data policy: because Gemini Free Tier terms allow human review and product improvement, only synthetic, de-identified project data is sent to the API.
+
+---
 
 ## Phase 9 Standard Phase Report (Final Release v1.0.0)
 

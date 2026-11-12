@@ -1,3 +1,13 @@
+/**
+ * Safe Test Data Cleanup Script (Item 6)
+ *
+ * BACKUP SAFEGUARDS:
+ * - Before running against production, create a database snapshot (e.g., pg_dump / Neon branch snapshot).
+ * - Target-restricted: Only deletes explicit temporary test entities and test projects ("DEV Phase 3*").
+ * - Invariant: NEVER touch the seeded demo project "Smart Attendance System (Synthetic Demo)" (cmwdiir940003t1c4i0b29dtg).
+ * - Invariant: NEVER touch demo user accounts (lead@continuityx.demo, member@continuityx.demo).
+ * - Idempotent: Can be run multiple times safely without error.
+ */
 import { prisma } from "../src/lib/db";
 
 async function cleanup() {
