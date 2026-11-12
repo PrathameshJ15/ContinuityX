@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const { id: projectId } = await params;
     const url = new URL(req.url);
     const ruleId = url.searchParams.get("ruleId") || undefined;
-    const status = (url.searchParams.get("status") as "OPEN" | "DISMISSED" | "ALL") || "ALL";
+    const status = (url.searchParams.get("status") as "OPEN" | "DISMISSED" | "ALL") || "OPEN";
 
     const data = await computeRadarAlertsService(projectId, user.id, { ruleId, status });
 

@@ -92,7 +92,7 @@ export default function RadarPage({
 
       const qs = new URLSearchParams();
       if (ruleFilter !== "ALL") qs.set("ruleId", ruleFilter);
-      if (statusFilter !== "ALL") qs.set("status", statusFilter);
+      qs.set("status", statusFilter);
 
       const res = await fetch(`/api/projects/${projectId}/radar?${qs.toString()}`);
       const json = await res.json();
