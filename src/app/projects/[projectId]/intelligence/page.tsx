@@ -425,8 +425,24 @@ export default function ContinuityIntelligencePage({
           {/* TAB 2: BUS FACTOR MAP */}
           {activeTab === "BUS_FACTOR" && busFactorData && (
             <div className="space-y-6">
-              {/* Bus Factor Hero */}
-              <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
+              {busFactorData.totalClaims === 0 ? (
+                <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
+                  <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="font-semibold text-foreground">No claims yet. Upload documents and run extraction first</p>
+                  <p className="text-xs text-muted-foreground mt-1 mb-4">
+                    Upload architecture documents to extract COMPONENT entities and owner claims.
+                  </p>
+                  <Link
+                    href={`/projects/${projectId}/documents`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    Go to Documents
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {/* Bus Factor Hero */}
+                  <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-bold text-foreground">
@@ -462,21 +478,7 @@ export default function ContinuityIntelligencePage({
               </div>
 
               {/* Component Cards */}
-              {busFactorData.totalClaims === 0 ? (
-                <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
-                  <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                  <p className="font-semibold text-foreground">No claims yet. Upload documents and run extraction first</p>
-                  <p className="text-xs text-muted-foreground mt-1 mb-4">
-                    Upload architecture documents to extract COMPONENT entities and owner claims.
-                  </p>
-                  <Link
-                    href={`/projects/${projectId}/documents`}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    Go to Documents
-                  </Link>
-                </div>
-              ) : busFactorData.components.length === 0 ? (
+              {busFactorData.components.length === 0 ? (
                 <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
                   <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                   <p className="font-medium text-foreground">No Component Entities Found</p>
@@ -562,6 +564,8 @@ export default function ContinuityIntelligencePage({
                     </div>
                   ))}
                 </div>
+              )}
+                </>
               )}
             </div>
           )}
