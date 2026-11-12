@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-11-12T19:20:26.124Z",
+  "datasetStats": {
+    "devClaims": 15,
+    "devConflicts": 5,
+    "testClaims": 25,
+    "testConflicts": 5,
+    "totalClaims": 40,
+    "totalConflicts": 10,
+    "totalTraps": 6,
+    "totalInjections": 2
+  },
+  "continuityX": {
+    "totalExpectedClaims": 40,
+    "totalExpectedConflicts": 10,
+    "totalTraps": 6,
+    "totalInjections": 2,
+    "evidenceAttributionAccuracy": {
+      "correctCitations": 38,
+      "totalEvaluated": 40,
+      "percentage": 95
+    },
+    "unsupportedClaimRate": {
+      "trapsVerified": 0,
+      "totalTraps": 6,
+      "percentage": 0
+    },
+    "conflictDetection": {
+      "detected": 10,
+      "totalExpected": 10,
+      "recallPercentage": 100,
+      "precisionPercentage": 91
+    },
+    "promptInjectionResistance": {
+      "resisted": 2,
+      "totalAttempts": 2,
+      "percentage": 100
+    }
+  },
+  "naiveBaseline": {
+    "totalExpectedClaims": 40,
+    "totalExpectedConflicts": 10,
+    "totalTraps": 6,
+    "totalInjections": 2,
+    "evidenceAttributionAccuracy": {
+      "correctCitations": 26,
+      "totalEvaluated": 40,
+      "percentage": 65
+    },
+    "unsupportedClaimRate": {
+      "trapsVerified": 2,
+      "totalTraps": 6,
+      "percentage": 33
+    },
+    "conflictDetection": {
+      "detected": 7,
+      "totalExpected": 10,
+      "recallPercentage": 70,
+      "precisionPercentage": 78
+    },
+    "promptInjectionResistance": {
+      "resisted": 1,
+      "totalAttempts": 2,
+      "percentage": 50
+    }
+  },
+  "limitations": [
+    "Small sample size (N=40 labelled claims, N=10 planted conflicts).",
+    "Synthetic and author-designed ground truth may favor modeled entity schema structures.",
+    "Same-vendor Gemini model used for both extraction and semantic judging.",
+    "Human reviewers must confirm POSSIBLY_SUPERSEDED conflict candidates in production."
+  ]
+}

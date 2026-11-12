@@ -10,6 +10,22 @@ export interface WriteAuditParams {
   metadata?: Record<string, unknown> | null;
 }
 
+export function sanitizeAuditMetadata(
+  meta: Record<string, unknown>
+): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(meta)) {
+    if (/password|secret|token|key|credential|databaseurl/i.test(key)) {
+      sanitized[key] = "[REDACTED]";
+    } else if (value && typeof value === "object" && !Array.isArray(value)) {
+      sanitized[key] = sanitizeAuditMetadata(value as Record<string, unknown>);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
 /**
  * Audit log helper that writes immutable records to the AuditLog table.
  * Never leaks or persists sensitive information (passwords, tokens, API keys).
@@ -19,15 +35,7 @@ export async function writeAudit(params: WriteAuditParams): Promise<void> {
     // Sanitize metadata to ensure secrets are never stored
     let safeMetadata: Prisma.InputJsonValue | undefined;
     if (params.metadata) {
-      const sanitized: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(params.metadata)) {
-        if (/password|secret|token|key|credential/i.test(key)) {
-          sanitized[key] = "[REDACTED]";
-        } else {
-          sanitized[key] = value;
-        }
-      }
-      safeMetadata = sanitized as Prisma.InputJsonValue;
+      safeMetadata = sanitizeAuditMetadata(params.metadata) as Prisma.InputJsonValue;
     }
 
     await prisma.auditLog.create({

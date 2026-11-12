@@ -1,0 +1,5 @@
+TaskID,Component,Status,Owner,DueDate,Notes
+FL-201,CAS Module,IN_PROGRESS,Sara Chen,2026-03-01,Obstacle avoidance calibration still running in windy conditions
+FL-202,Camera Payload Driver,NOT_STARTED,,2026-03-05,Unassigned sensor driver integration task
+FL-203,Flight Telemetry Dashboard,BLOCKED,David Miller,2026-03-10,Depends on Telemetry Link completion
+FL-204,Landing Gear Actuator,IN_PROGRESS,Sara Patel,2026-03-12,Bench testing servo motor cycle times

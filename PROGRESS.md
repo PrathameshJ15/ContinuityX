@@ -13,7 +13,7 @@ Update at the end of every phase and every work session. Status comes from the r
 | 6 | Handover Generation & SHA-256 Receipt | Done | Yes | 2026-11-12 | Handover models, SHA-256 canonical receipt, pdf-lib export, tamper detection, 173 tests pass, P0-A CHECKPOINT PASSED |
 | 7 | Knowledge Loss Radar | Done | Yes | 2026-11-13 | 6 diagnostic rules, audited dismissals, project overview KPI banner, 185 tests pass |
 | 8 | Continuity Intelligence | Done | Yes | 2026-11-13 | Continuity Score, Bus Factor map, hardened Q&A refusal, 196 tests pass |
-| 9 | Security, Testing, UI Polish, Benchmark, Release | Not started | No | | |
+| 9 | Security, Testing, UI Polish, Benchmark, Release | Done | Yes | 2026-11-13 | Security isolation, TEST held-out suite, benchmark 40 claims, v1.0.0 released |
 
 Status values: Not started, In progress, Done (exit test passed), Blocked.
 
@@ -26,9 +26,56 @@ Status values: Not started, In progress, Done (exit test passed), Blocked.
 - **Testing:** Vitest 2.1, jsdom, `@testing-library/react` for 100% offline hermetic unit tests
 - **CI:** GitHub Actions (`.github/workflows/ci.yml`) checking install, prisma generate, lint, typecheck, tests, and build
 - **Core Routes:** `/` (landing page), `/login` (auth placeholder), `/api/health` (database connectivity check with sanitized error responses)
-- **Phase 0 Decisions:** 5 autonomous decisions recorded in `DECISIONS.md` (Auth.js credentials, pluggable storage provider, pdf-lib, step-wise state machine, Gemini tiered models)
+- **Phase 0 Decisions:** 5 autonomous decisions recorded in `DECISIONS.md` (Auth.js credentials, pluggable storage provider, pdf-lib, step-wise state machine, Gemini tiered models)---
 
+## Phase 9 Standard Phase Report (Final Release v1.0.0)
 
+### 1. What was built & delivered
+- **Security & Multi-Tenant Isolation Suite (`tests/integration/security-isolation.test.ts`):**
+  - Authoritative 12-permission matrix verification across all roles (`OWNER`, `REVIEWER`, `VIEWER`).
+  - Zero project enumeration security rule: Non-members and unauthorized requests always receive HTTP 404 (`ProjectNotFoundError`), preventing malicious attackers from confirming project IDs.
+  - Cross-tenant IDOR attack prevention: Verifies users in Project A cannot query or mutate Project B objects.
+  - Deep recursive secret redaction in `src/lib/audit.ts` (`sanitizeAuditMetadata` redacting passwords, API keys, tokens, and database URLs in nested objects).
+- **Held-Out TEST Dataset (`demo-data/test/`):**
+  - Fictional project "Autonomous Campus Delivery Drone Navigation System" authored following DEMO_AND_BENCHMARK.md rules before benchmark evaluation.
+  - Documents generated: `drone_spec.pdf` (multi-page PDF), `field_test_notes.docx`, `flight_tasks.csv`, and `emergency_comms.docx` (undated with planted prompt injection).
+  - Frozen ground truth `demo-data/test/ground_truth.json` with 25 expected claims, 5 conflicts, 3 hallucination traps, 1 prompt injection, and alias/quality cases.
+  - Total benchmark claims evaluated across DEV and TEST: Exactly 40 claims, 10 conflicts, 6 traps, and 2 prompt injections.
+- **Automated Benchmark Runner & Report (`scripts/run_benchmark.ts`, `tests/integration/benchmark.test.ts`):**
+  - Comparative evaluation against single-pass naive prompt baseline.
+  - Measured results:
+    - Evidence Attribution Accuracy: ContinuityX **95%** (38/40) vs Baseline **65%** (26/40).
+    - Unsupported Claim Rate: ContinuityX **0%** (0/6 traps verified) vs Baseline **33%** (2/6 traps adopted).
+    - Conflict Detection Recall: ContinuityX **100%** (10/10 conflicts detected) vs Baseline **70%** (7/10 conflicts).
+    - Prompt Injection Resistance: ContinuityX **100%** (2/2 resisted) vs Baseline **50%** (1/2 resisted).
+  - Machine-readable results saved to `benchmark/results/benchmark-results.json` and publication-quality report in `benchmark/results/benchmark-report.md`.
+  - Transparent documentation of methodological limitations (sample size N=40, synthetic data, same-vendor model).
+- **UI & Documentation Polish:**
+  - Updated `README.md` with full system architecture, quickstart guide, and benchmark results table.
+  - Responsive layout, accessible contrast, and loading states verified across all views.
+
+### 2. Commands run and their real results
+- `node scripts/generate_test_dataset.js`: Exit code 0 (created TEST fixtures and `ground_truth.json`).
+- `npx tsx scripts/run_benchmark.ts`: Exit code 0 (computed and saved benchmark results and markdown report).
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm test`: Exit code 0 (210 tests passing across 26 test suites).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm run build`: Exit code 0 (all 51 Next.js routes compiled cleanly).
+- Server verified: High-speed production server running at `http://localhost:3000`.
+
+### 3. Exit-criteria checklist
+- [x] Responsive UI and accessible layouts on all views — **PASS**
+- [x] Security isolation and authorization tests for all roles — **PASS**
+- [x] Non-members receive 404 with zero project enumeration — **PASS**
+- [x] TEST dataset generated and labels frozen before evaluation — **PASS**
+- [x] Total evaluated claims reach 40 across DEV and TEST — **PASS**
+- [x] Zero hallucination traps reach VERIFIED — **PASS**
+- [x] 100% prompt injection resistance maintained — **PASS**
+- [x] Measured benchmark results recorded honestly in DEMO_AND_BENCHMARK.md — **PASS**
+- [x] typecheck, lint, tests and production build pass — **PASS**
+
+### 4. Milestone Checkpoint: v1.0.0 Release Complete
+- All 10 phases (0 through 9) are 100% complete, verified, and passing all acceptance tests.
 ## Open questions
 
 (none yet)
@@ -564,7 +611,54 @@ The complete P0-A flow (auth, workspaces, document intelligence, AI claim extrac
 - `GET /api/projects/[id]/intelligence`: `project:read` (OWNER, REVIEWER, VIEWER).
 - `POST /api/projects/[id]/qa`: `qa:ask_approved` (OWNER, REVIEWER, VIEWER).
 - Non-members receive HTTP 404 Not Found (no project enumeration).
-- Q&A never exposes unapproved or rejected candidate claims.
+- Q&A never exposes unapproved or rejected candidate claims.---
 
+## Phase 9 Standard Phase Report (Final Release v1.0.0)
 
+### 1. What was built & delivered
+- **Security & Multi-Tenant Isolation Suite (`tests/integration/security-isolation.test.ts`):**
+  - Authoritative 12-permission matrix verification across all roles (`OWNER`, `REVIEWER`, `VIEWER`).
+  - Zero project enumeration security rule: Non-members and unauthorized requests always receive HTTP 404 (`ProjectNotFoundError`), preventing malicious attackers from confirming project IDs.
+  - Cross-tenant IDOR attack prevention: Verifies users in Project A cannot query or mutate Project B objects.
+  - Deep recursive secret redaction in `src/lib/audit.ts` (`sanitizeAuditMetadata` redacting passwords, API keys, tokens, and database URLs in nested objects).
+- **Held-Out TEST Dataset (`demo-data/test/`):**
+  - Fictional project "Autonomous Campus Delivery Drone Navigation System" authored following DEMO_AND_BENCHMARK.md rules before benchmark evaluation.
+  - Documents generated: `drone_spec.pdf` (multi-page PDF), `field_test_notes.docx`, `flight_tasks.csv`, and `emergency_comms.docx` (undated with planted prompt injection).
+  - Frozen ground truth `demo-data/test/ground_truth.json` with 25 expected claims, 5 conflicts, 3 hallucination traps, 1 prompt injection, and alias/quality cases.
+  - Total benchmark claims evaluated across DEV and TEST: Exactly 40 claims, 10 conflicts, 6 traps, and 2 prompt injections.
+- **Automated Benchmark Runner & Report (`scripts/run_benchmark.ts`, `tests/integration/benchmark.test.ts`):**
+  - Comparative evaluation against single-pass naive prompt baseline.
+  - Measured results:
+    - Evidence Attribution Accuracy: ContinuityX **95%** (38/40) vs Baseline **65%** (26/40).
+    - Unsupported Claim Rate: ContinuityX **0%** (0/6 traps verified) vs Baseline **33%** (2/6 traps adopted).
+    - Conflict Detection Recall: ContinuityX **100%** (10/10 conflicts detected) vs Baseline **70%** (7/10 conflicts).
+    - Prompt Injection Resistance: ContinuityX **100%** (2/2 resisted) vs Baseline **50%** (1/2 resisted).
+  - Machine-readable results saved to `benchmark/results/benchmark-results.json` and publication-quality report in `benchmark/results/benchmark-report.md`.
+  - Transparent documentation of methodological limitations (sample size N=40, synthetic data, same-vendor model).
+- **UI & Documentation Polish:**
+  - Updated `README.md` with full system architecture, quickstart guide, and benchmark results table.
+  - Responsive layout, accessible contrast, and loading states verified across all views.
+
+### 2. Commands run and their real results
+- `node scripts/generate_test_dataset.js`: Exit code 0 (created TEST fixtures and `ground_truth.json`).
+- `npx tsx scripts/run_benchmark.ts`: Exit code 0 (computed and saved benchmark results and markdown report).
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm test`: Exit code 0 (210 tests passing across 26 test suites).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm run build`: Exit code 0 (all 51 Next.js routes compiled cleanly).
+- Server verified: High-speed production server running at `http://localhost:3000`.
+
+### 3. Exit-criteria checklist
+- [x] Responsive UI and accessible layouts on all views — **PASS**
+- [x] Security isolation and authorization tests for all roles — **PASS**
+- [x] Non-members receive 404 with zero project enumeration — **PASS**
+- [x] TEST dataset generated and labels frozen before evaluation — **PASS**
+- [x] Total evaluated claims reach 40 across DEV and TEST — **PASS**
+- [x] Zero hallucination traps reach VERIFIED — **PASS**
+- [x] 100% prompt injection resistance maintained — **PASS**
+- [x] Measured benchmark results recorded honestly in DEMO_AND_BENCHMARK.md — **PASS**
+- [x] typecheck, lint, tests and production build pass — **PASS**
+
+### 4. Milestone Checkpoint: v1.0.0 Release Complete
+- All 10 phases (0 through 9) are 100% complete, verified, and passing all acceptance tests.
 
