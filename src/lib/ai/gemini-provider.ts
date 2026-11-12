@@ -33,6 +33,23 @@ export class GeminiLLMProvider implements LLMProvider {
   readonly name = "gemini";
 
   async generateStructuredText(request: LLMGenerationRequest): Promise<LLMGenerationResponse> {
+    try {
+      return await this.executeCall(request);
+    } catch (err: unknown) {
+      // Fallback: If primary model hit timeout, rate limit, or 503, retry once with fast gemini-3.5-flash-lite
+      const requestedModel = request.model || env.GEMINI_EXTRACTION_MODEL;
+      if (requestedModel !== "gemini-3.5-flash-lite") {
+        console.warn(`[GeminiLLMProvider] Model ${requestedModel} failed, retrying with fast fallback gemini-3.5-flash-lite...`);
+        return await this.executeCall({
+          ...request,
+          model: "gemini-3.5-flash-lite",
+        });
+      }
+      throw err;
+    }
+  }
+
+  private async executeCall(request: LLMGenerationRequest): Promise<LLMGenerationResponse> {
     const apiKey = env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
       throw new LLMProviderError("GEMINI_API_KEY is not configured on the server.", {

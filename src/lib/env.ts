@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+// Automatically load local .env in Node scripts and non-Next runtime if available
+try {
+  if (typeof process.loadEnvFile === "function") {
+    process.loadEnvFile();
+  }
+} catch {
+  // Ignore if .env is missing or already loaded by Next.js
+}
+
 const envSchema = z.object({
   DATABASE_URL: z
     .string()
