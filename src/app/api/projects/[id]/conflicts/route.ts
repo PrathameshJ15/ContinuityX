@@ -77,9 +77,23 @@ export async function GET(
       },
     });
 
-    const totalProjectClaims = await prisma.claim.count({ where: { projectId } });
+    const [totalProjectClaims, allConflictsForCounts] = await Promise.all([
+      prisma.claim.count({ where: { projectId } }),
+      prisma.conflict.findMany({
+        where: { projectId },
+        select: { status: true },
+      }),
+    ]);
 
-    return jsonSuccess({ conflicts, totalProjectClaims });
+    const counts = {
+      ALL: allConflictsForCounts.length,
+      OPEN: allConflictsForCounts.filter((c) => !c.status.startsWith("RESOLVED_")).length,
+      POSSIBLY_SUPERSEDED: allConflictsForCounts.filter((c) => c.status === "POSSIBLY_SUPERSEDED").length,
+      REQUIRES_CLARIFICATION: allConflictsForCounts.filter((c) => c.status === "REQUIRES_CLARIFICATION").length,
+      RESOLVED: allConflictsForCounts.filter((c) => c.status.startsWith("RESOLVED_")).length,
+    };
+
+    return jsonSuccess({ conflicts, totalProjectClaims, counts });
   } catch (error) {
     return handleApiError(error);
   }

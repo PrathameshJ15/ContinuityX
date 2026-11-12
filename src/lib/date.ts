@@ -47,6 +47,10 @@ export function formatDate(
   return `${day} ${monthName} ${year}`;
 }
 
+/**
+ * Shared date-time formatter for audit entries, receipts, and verification timestamps.
+ * Formats strictly in 24-hour time with timezone, e.g. "12 Nov 2026, 14:30:00 UTC".
+ */
 export function formatDateTime(
   input: string | number | Date | null | undefined,
   fallback = ""
@@ -56,6 +60,9 @@ export function formatDateTime(
   if (isNaN(d.getTime())) return fallback;
 
   const dateStr = formatDate(d, fallback);
-  const timeStr = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return `${dateStr} ${timeStr}`;
+  const hours = String(d.getUTCHours()).padStart(2, "0");
+  const minutes = String(d.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(d.getUTCSeconds()).padStart(2, "0");
+
+  return `${dateStr}, ${hours}:${minutes}:${seconds} UTC`;
 }

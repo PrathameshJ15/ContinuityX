@@ -19,9 +19,10 @@ describe("Shared Date Formatter (Item 6)", () => {
     expect(formatDate("invalid-date-string", "N/A")).toBe("N/A");
   });
 
-  it("formats date-time strings with date prefix", () => {
-    const d = new Date(2026, 10, 12, 14, 30);
+  it("formats date-time strings strictly in 24-hour format with timezone (Item 5)", () => {
+    // 2026-11-12T14:30:00.000Z
+    const d = new Date(Date.UTC(2026, 10, 12, 14, 30, 0));
     const result = formatDateTime(d);
-    expect(result).toContain("12 Nov 2026");
+    expect(result).toBe("12 Nov 2026, 14:30:00 UTC");
   });
 });

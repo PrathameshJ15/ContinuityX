@@ -85,6 +85,13 @@ export default function ConflictsPage({
 
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
   const [totalClaims, setTotalClaims] = useState<number | null>(null);
+  const [counts, setCounts] = useState<{
+    ALL: number;
+    OPEN: number;
+    POSSIBLY_SUPERSEDED: number;
+    REQUIRES_CLARIFICATION: number;
+    RESOLVED: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -112,6 +119,7 @@ export default function ConflictsPage({
 
       setConflicts(json.data.conflicts || []);
       setTotalClaims(typeof json.data.totalProjectClaims === "number" ? json.data.totalProjectClaims : null);
+      if (json.data.counts) setCounts(json.data.counts);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load conflicts");
     } finally {
@@ -290,12 +298,12 @@ export default function ConflictsPage({
           onChange={(e) => setStatusFilter(e.target.value)}
           className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium"
         >
-          <option value="ALL">All Conflicts</option>
-          <option value="OPEN">Open Conflicts</option>
-          <option value="POSSIBLY_SUPERSEDED">Possibly Superseded</option>
-          <option value="REQUIRES_CLARIFICATION">Requires Clarification</option>
+          <option value="ALL">All Conflicts {counts ? `(${counts.ALL})` : ""}</option>
+          <option value="OPEN">Open Conflicts {counts ? `(${counts.OPEN})` : ""}</option>
+          <option value="POSSIBLY_SUPERSEDED">Possibly Superseded {counts ? `(${counts.POSSIBLY_SUPERSEDED})` : ""}</option>
+          <option value="REQUIRES_CLARIFICATION">Requires Clarification {counts ? `(${counts.REQUIRES_CLARIFICATION})` : ""}</option>
           <option value="RESOLVED_ONE_ACCEPTED">Resolved (One Accepted)</option>
-          <option value="RESOLVED_MUTUAL_ACCEPT">Resolved (Mutual Accept / Co-owners)</option>
+          <option value="RESOLVED_MUTUAL_ACCEPT">Resolved (Mutual Accept)</option>
         </select>
       </div>
 

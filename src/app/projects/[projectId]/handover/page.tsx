@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatDateTime } from "@/lib/date";
 import {
   AlertCircle,
   AlertTriangle,
@@ -448,7 +448,7 @@ export default function HandoverPage({
               <span className="font-semibold text-foreground">
                 {approvedData.receipt.approvedBy.name}
               </span>{" "}
-              on {new Date(approvedData.receipt.approvedAt).toUTCString()}
+              on {formatDateTime(approvedData.receipt.approvedAt)}
             </div>
           </div>
 

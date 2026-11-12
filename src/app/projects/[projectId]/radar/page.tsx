@@ -335,9 +335,17 @@ export default function RadarPage({
               }`}
             >
               {r.label}
-              {metrics && r.id !== "ALL" && metrics.byRule[r.id as keyof typeof metrics.byRule] > 0 && (
+              {metrics && (
                 <span className="ml-1 font-bold">
-                  ({metrics.byRule[r.id as keyof typeof metrics.byRule]})
+                  (
+                  {r.id === "ALL"
+                    ? statusFilter === "DISMISSED"
+                      ? metrics.totalDismissed
+                      : statusFilter === "ALL"
+                      ? metrics.totalOpen + metrics.totalDismissed
+                      : metrics.totalOpen
+                    : metrics.byRule[r.id as keyof typeof metrics.byRule] ?? 0}
+                  )
                 </span>
               )}
             </button>
@@ -346,19 +354,30 @@ export default function RadarPage({
 
         {/* Status Toggle */}
         <div className="flex items-center gap-1 border-l pl-3">
-          {(["OPEN", "DISMISSED", "ALL"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                statusFilter === s
-                  ? "bg-foreground text-background font-semibold"
-                  : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+          {(["OPEN", "DISMISSED", "ALL"] as const).map((s) => {
+            const count =
+              metrics
+                ? s === "OPEN"
+                  ? metrics.totalOpen
+                  : s === "DISMISSED"
+                  ? metrics.totalDismissed
+                  : metrics.totalOpen + metrics.totalDismissed
+                : null;
+
+            return (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                  statusFilter === s
+                    ? "bg-foreground text-background font-semibold"
+                    : "text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {s} {count !== null ? `(${count})` : ""}
+              </button>
+            );
+          })}
         </div>
       </div>
 
