@@ -92,35 +92,73 @@ enum EvidenceType {
   SECTION_EXCERPT
 }
 
+enum EvidenceStatus {
+  VERIFIED
+  WEAK_SUPPORT
+  CONFLICTING
+  UNVERIFIED
+  UNKNOWN
+}
+
+enum GateOutcome {
+  PASS
+  FAIL
+}
+
+enum SemanticSupportOutcome {
+  SUPPORTS
+  NEUTRAL
+  CONTRADICTS
+  INSUFFICIENT_CONTEXT
+}
+
+enum ConflictType {
+  STATUS_CONFLICT
+  OWNERSHIP_CONFLICT
+  DECISION_CONFLICT
+  TIMELINE_CONFLICT
+  VALUE_CONFLICT
+}
+
+enum ConflictResolutionState {
+  OPEN
+  POSSIBLY_SUPERSEDED
+  RESOLVED_MUTUAL_ACCEPT
+  RESOLVED_ONE_ACCEPTED
+  RESOLVED_BOTH_REJECTED
+  RESOLVED_EDITED
+}
+
 model User {
-  id              String          @id @default(cuid())
-  name            String
-  email           String          @unique
-  passwordHash    String
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  memberships     ProjectMember[]
-  createdProjects Project[]       @relation("ProjectCreator")
+  id                String          @id @default(cuid())
+  name              String
+  email             String          @unique
+  passwordHash      String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  memberships       ProjectMember[]
+  createdProjects   Project[]       @relation("ProjectCreator")
   uploadedDocuments Document[]
-  auditLogs       AuditLog[]
+  auditLogs         AuditLog[]
 
   @@index([email])
 }
 
 model Project {
-  id            String          @id @default(cuid())
-  name          String
-  description   String?
-  status        ProjectStatus   @default(ACTIVE)
-  createdBy     String
-  createdByUser User            @relation("ProjectCreator", fields: [createdBy], references: [id], onDelete: Restrict)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id             String          @id @default(cuid())
+  name           String
+  description    String?
+  status         ProjectStatus   @default(ACTIVE)
+  createdBy      String
+  createdByUser  User            @relation("ProjectCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   members        ProjectMember[]
   documents      Document[]
   extractionRuns ExtractionRun[]
   entities       Entity[]
   claims         Claim[]
+  conflicts      Conflict[]
   auditLogs      AuditLog[]
 
   @@index([createdBy])
@@ -153,7 +191,7 @@ model Document {
   mimeType         String
   storageKey       String
   fileSize         Int
-  checksum         String                   // SHA-256 hash of raw file
+  checksum         String // SHA-256 hash of raw file
   pageCount        Int                      @default(1)
   textQuality      TextQuality              @default(OK)
   sourceDate       DateTime?
@@ -266,6 +304,7 @@ model Entity {
   updatedAt      DateTime      @updatedAt
   aliases        EntityAlias[]
   claims         Claim[]
+  conflicts      Conflict[]
 
   @@unique([projectId, normalizedId])
   @@index([projectId, type])
@@ -303,10 +342,13 @@ model Claim {
   extractionRunId   String?
   extractionRun     ExtractionRun?  @relation(fields: [extractionRunId], references: [id], onDelete: SetNull)
   injectionFlag     Boolean         @default(false)
-  confidence        Float?          // Advisory only; never used to derive evidence status
+  confidence        Float? // Advisory only; never used to derive evidence status
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   evidence          ClaimEvidence[]
+  verifications     Verification[]
+  conflictsAsA      Conflict[]      @relation("ConflictClaimA")
+  conflictsAsB      Conflict[]      @relation("ConflictClaimB")
 
   @@index([projectId, subjectEntityId, attributeKey])
   @@index([projectId, category, reviewState])
@@ -330,6 +372,59 @@ model ClaimEvidence {
 
   @@index([claimId])
   @@index([documentId, chunkId])
+}
+
+model Verification {
+  id                 String                  @id @default(cuid())
+  claimId            String
+  claim              Claim                   @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  status             EvidenceStatus
+  sourceGate         GateOutcome
+  sourceGateReason   String?
+  quoteGate          GateOutcome
+  quoteGateReason    String?
+  quoteSimilarity    Float?
+  semanticGate       SemanticSupportOutcome?
+  semanticReason     String?                 @db.Text
+  contradictionGate  GateOutcome
+  contradictionCount Int                     @default(0)
+  ruleSetVersion     String                  @default("v3.2")
+  judgeModel         String?
+  judgePromptVersion String?
+  rawJudgeOutput     Json?
+  verifiedAt         DateTime                @default(now())
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  @@index([claimId])
+  @@index([status])
+  @@index([verifiedAt])
+}
+
+model Conflict {
+  id               String                  @id @default(cuid())
+  projectId        String
+  project          Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subjectEntityId  String
+  subjectEntity    Entity                  @relation(fields: [subjectEntityId], references: [id], onDelete: Restrict)
+  attributeKey     String
+  claimAId         String
+  claimA           Claim                   @relation("ConflictClaimA", fields: [claimAId], references: [id], onDelete: Cascade)
+  claimBId         String
+  claimB           Claim                   @relation("ConflictClaimB", fields: [claimBId], references: [id], onDelete: Cascade)
+  conflictType     ConflictType
+  status           ConflictResolutionState @default(OPEN)
+  resolutionNotes  String?                 @db.Text
+  resolvedByUserId String?
+  resolvedAt       DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@unique([claimAId, claimBId])
+  @@index([projectId, status])
+  @@index([subjectEntityId, attributeKey])
+  @@index([claimAId])
+  @@index([claimBId])
 }
 
 model HealthCheck {

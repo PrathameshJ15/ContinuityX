@@ -8,8 +8,8 @@ Update at the end of every phase and every work session. Status comes from the r
 | 1 | Authentication & Project Workspace | Done | Yes | 2026-11-12 | Auth, User/Project/ProjectMember/AuditLog, permission matrix (61 tests pass) |
 | 2 | Document Intelligence & Upload | Done | Yes | 2026-11-12 | Live Neon migration applied & seeded; validation, parsers, chunking, DEV dataset, 95 tests pass |
 | 3 | AI Claim Extraction & Entity Registry | Done | Yes | 2026-11-12 | Extraction pipeline, entity registry, vocabulary normalization, injection defense, 114 tests pass |
-| 4 | Proof-Carrying Verification Engine | In progress | No | 2026-11-12 | Phase 4 plan drafted; implementing 4-gate verification & deterministic status algorithm |
-| 5 | Conflict Detection & Human Review | Not started | No | | |
+| 4 | Proof-Carrying Verification Engine | Done | Yes | 2026-11-12 | 4-gate verification engine, SPEC.md V3.2 9-row status table, DEV eval 15/15 matched, 148 tests pass |
+| 5 | Conflict Detection & Human Review | In progress | No | 2026-11-12 | Conflict models & pairwise detection implemented; building split-pane review & resolution flows |
 | 6 | Handover Generation & SHA-256 Receipt | Not started | No | | |
 | 7 | Knowledge Loss Radar | Not started | No | | |
 | 8 | Continuity Intelligence | Not started | No | | |
@@ -207,6 +207,79 @@ Every route strictly calls `requireProjectAccess` enforcing server-side permissi
 - `GET /api/projects/[id]/entities/[entityId]`: `project:read` (OWNER, REVIEWER, VIEWER)
 - `PATCH /api/projects/[id]/entities/[entityId]`: `review:claims_conflicts_entities` (OWNER, REVIEWER)
 - `POST /api/projects/[id]/entities/merge`: `review:claims_conflicts_entities` (OWNER, REVIEWER)
+
+---
+
+## Phase 4 Standard Phase Report
+
+### 1. What was built
+- **Database Models & Enums (`prisma/migrations/20261112145500_init_phase4_verification_conflicts`):**
+  - Added models: `Verification` and `Conflict`.
+  - Added enums: `EvidenceStatus` (`VERIFIED`, `WEAK_SUPPORT`, `CONFLICTING`, `UNVERIFIED`, `UNKNOWN`), `GateOutcome` (`PASS`, `FAIL`), `SemanticSupportOutcome` (`SUPPORTS`, `NEUTRAL`, `CONTRADICTS`, `INSUFFICIENT_CONTEXT`), `ConflictType` (`STATUS_CONFLICT`, `OWNERSHIP_CONFLICT`, `DECISION_CONFLICT`, `TIMELINE_CONFLICT`, `VALUE_CONFLICT`), and `ConflictResolutionState` (`OPEN`, `POSSIBLY_SUPERSEDED`, `RESOLVED_MUTUAL_ACCEPT`, `RESOLVED_ONE_ACCEPTED`, `RESOLVED_BOTH_REJECTED`, `RESOLVED_EDITED`).
+  - Added relations linking `Claim` with `Verification` and reciprocal pairs with `Conflict` using canonical ID ordering (`claimAId < claimBId`).
+- **Gate 1 (Source Existence):**
+  - Deterministically verifies that the cited document exists, is not soft-deleted, belongs to the same project, and referenced chunk contains valid content.
+- **Gate 2 (Quote Existence & Normalization, `src/services/verification/quote-matcher.ts`):**
+  - Normalizes Unicode quotes/dashes/whitespace and strips punctuation.
+  - Verbatim exact substring, normalized substring, and high token overlap (>= 85% for hyphenation/wrapping artifacts).
+  - Explicitly rejects hallucinated/fabricated quotes and materially altered meaning.
+  - Entity-in-text check (`checkEntityInText`) matching canonical names, aliases, and prominent entity tokens.
+- **Gate 3 (Independent Semantic Support Judge, `src/lib/ai/prompts/judge-v1.ts`, `src/lib/ai/judge-caller.ts`):**
+  - Isolated judge prompt (`JUDGE_PROMPT_VERSION = "v1.0.0"`) with zero tools, temperature 0, and untrusted delimiter tags (`<untrusted_cited_excerpt>`).
+  - Input contains strictly the claim triple `(subject, attribute, value)`, cited excerpt, and minimal location context (never full documents or extractor confidence).
+  - Strict Zod schema validation (`judgeOutputSchema`) with 1 controlled retry on error.
+  - Critical Rule: Skipped entirely if Gate 1 or Gate 2 fails.
+- **Gate 4 (Pairwise Conflict Detection & Chronology, `src/services/conflicts/detection.ts`):**
+  - Detects competing claims sharing canonical subject entity & attributeKey where normalized values differ.
+  - Evaluates temporal chronology: differing reliable dates (`USER_PROVIDED`, `CONTENT_EXPLICIT`) initialize as `POSSIBLY_SUPERSEDED`; missing/unknown dates initialize as `OPEN`.
+  - Pairwise canonical ordering `(claimAId < claimBId)` with unique constraint.
+- **Authoritative Status Algorithm (`src/services/verification/algorithm.ts`):**
+  - Implements the exact 9-row first-match decision table from SPEC.md V3.2.
+  - Pure, deterministic, and 100% reproducible: status is never derived from model confidence.
+- **Verification API Routes:**
+  - `POST /api/projects/[id]/verify` (Batch verification for all active claims)
+  - `POST /api/projects/[id]/claims/[claimId]/verify` (Single claim verification)
+  - `GET /api/projects/[id]/claims/[claimId]/verification` (Verification history and breakdown)
+  - `GET /api/projects/[id]/conflicts` (Conflict inspection)
+- **UI Enhancements (`src/app/projects/[projectId]/claims/page.tsx`):**
+  - Evidence status badges with distinctive text labels and icons (`VERIFIED`, `WEAK_SUPPORT`, `CONFLICTING`, `UNVERIFIED`, `UNKNOWN`).
+  - Interactive "Proof-Carrying Verification Gates" breakdown modal displaying individual gate outcomes, quote similarity %, judge model/prompt version, and active conflict count.
+  - Single claim "Verify" and project-wide "Verify All Claims" actions with live progress.
+  - Evidence status filter dropdown.
+- **Evaluation Script (`scripts/eval/verify-dev.ts`, `npm run eval:verify-dev`):**
+  - Evaluates all expected DEV claims (`G001` - `G015`) and hallucination traps (`H1` - `H3`) against the 4-gate verification engine.
+
+### 2. Commands run and their real results
+- `npx prisma migrate deploy`: Exit code 0 (applied migration to Neon PostgreSQL).
+- `npx prisma generate`: Exit code 0 (updated Prisma Client with Phase 4 models and enums).
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm test`: Exit code 0 (148 tests passed across 17 test suites, including 11 status algorithm tests, 9 quote matcher tests, 9 conflict detection tests, and 5 integration/auth tests).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm run build`: Exit code 0 (all 31 routes compiled cleanly).
+- `npm run eval:verify-dev`: Exit code 0 (15/15 expected claim statuses matched 100%; traps H1-H3 defended as UNVERIFIED).
+
+### 3. Exit-criteria checklist
+- [x] All four gates run and store their outcomes — **PASS**
+- [x] The status function matches the SPEC.md table exactly (all 9 rules tested) — **PASS**
+- [x] Hallucination traps never reach VERIFIED on the DEV data — **PASS** (traps H1, H2, H3 end in UNVERIFIED)
+- [x] Status never depends on model confidence (enforced in `src/services/verification/algorithm.ts`) — **PASS**
+- [x] Verification is retry-safe and failures are visible — **PASS**
+- [x] The DEV expected-versus-actual table is produced and mismatches explained — **PASS**
+- [x] typecheck, lint, tests and build pass — **PASS**
+
+### 4. Deviations and DECISIONS.md entries
+- Added 3 Phase 4 entries in `DECISIONS.md`:
+  - `[2026-11-12] | Deterministic V3.2 Evidence-Status Algorithm`
+  - `[2026-11-12] | Independent Semantic Judge Isolation & Temperature 0`
+  - `[2026-11-12] | Canonical Pairwise Conflict Ordering`
+
+### 5. Security confirmation: Verification and Conflict routes enforcement
+All verification and conflict routes strictly call `requireProjectAccess` enforcing server-side permission checks:
+- `POST /api/projects/[id]/verify`: `ai:run_extraction_verification` (OWNER, REVIEWER)
+- `POST /api/projects/[id]/claims/[claimId]/verify`: `ai:run_extraction_verification` (OWNER, REVIEWER)
+- `GET /api/projects/[id]/claims/[claimId]/verification`: `claims:view_unapproved` (OWNER, REVIEWER)
+- `GET /api/projects/[id]/conflicts`: `claims:view_unapproved` (OWNER, REVIEWER)
+
 
 
 

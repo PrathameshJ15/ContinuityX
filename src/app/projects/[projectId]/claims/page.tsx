@@ -9,12 +9,35 @@ import {
   ChevronRight,
   Edit3,
   Eye,
+  FileQuestion,
   FileText,
   Filter,
+  HelpCircle,
   Loader2,
+  Play,
+  RotateCw,
   ShieldAlert,
+  ShieldCheck,
   X,
 } from "lucide-react";
+
+interface VerificationItem {
+  id: string;
+  status: "VERIFIED" | "WEAK_SUPPORT" | "CONFLICTING" | "UNVERIFIED" | "UNKNOWN";
+  sourceGate: "PASS" | "FAIL";
+  sourceGateReason: string | null;
+  quoteGate: "PASS" | "FAIL";
+  quoteGateReason: string | null;
+  quoteSimilarity: number | null;
+  semanticGate: "SUPPORTS" | "NEUTRAL" | "CONTRADICTS" | "INSUFFICIENT_CONTEXT" | null;
+  semanticReason: string | null;
+  contradictionGate: "PASS" | "FAIL";
+  contradictionCount: number;
+  ruleSetVersion: string;
+  judgeModel: string | null;
+  judgePromptVersion: string | null;
+  verifiedAt: string;
+}
 
 interface ClaimEvidenceItem {
   id: string;
@@ -51,6 +74,7 @@ interface ClaimItem {
     needsReview: boolean;
   };
   evidence: ClaimEvidenceItem[];
+  verifications?: VerificationItem[];
 }
 
 interface EntityOption {
@@ -101,6 +125,14 @@ const ATTRIBUTES = [
   "rationale",
 ];
 
+const EVIDENCE_STATUSES = [
+  "VERIFIED",
+  "WEAK_SUPPORT",
+  "CONFLICTING",
+  "UNVERIFIED",
+  "UNKNOWN",
+];
+
 export default function ClaimsPage({
   params,
 }: {
@@ -123,11 +155,16 @@ export default function ClaimsPage({
   const [categoryFilter, setCategoryFilter] = useState("");
   const [attributeFilter, setAttributeFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [injectionOnly, setInjectionOnly] = useState(false);
   const [needsNormOnly, setNeedsNormOnly] = useState(false);
 
-  // Detail & Edit state
+  // Detail, Gate Breakdown & Edit state
   const [selectedDetail, setSelectedDetail] = useState<ClaimDetail | null>(null);
+  const [inspectingVerification, setInspectingVerification] = useState<VerificationItem | null>(null);
+  const [verifyingClaimId, setVerifyingClaimId] = useState<string | null>(null);
+  const [batchVerifying, setBatchVerifying] = useState(false);
+
   const [editingClaim, setEditingClaim] = useState<ClaimItem | null>(null);
   const [editSubjectId, setEditSubjectId] = useState("");
   const [editAttributeKey, setEditAttributeKey] = useState("");
@@ -144,6 +181,7 @@ export default function ClaimsPage({
       if (categoryFilter) qs.set("category", categoryFilter);
       if (attributeFilter) qs.set("attributeKey", attributeFilter);
       if (entityFilter) qs.set("entityId", entityFilter);
+      if (statusFilter) qs.set("evidenceStatus", statusFilter);
       if (injectionOnly) qs.set("injectionFlag", "true");
       if (needsNormOnly) qs.set("needsNormalization", "true");
 
@@ -172,7 +210,7 @@ export default function ClaimsPage({
     } finally {
       setLoading(false);
     }
-  }, [projectId, page, categoryFilter, attributeFilter, entityFilter, injectionOnly, needsNormOnly]);
+  }, [projectId, page, categoryFilter, attributeFilter, entityFilter, statusFilter, injectionOnly, needsNormOnly]);
 
   useEffect(() => {
     loadData();
@@ -187,6 +225,51 @@ export default function ClaimsPage({
       setSelectedDetail(json.data.claim);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load claim detail");
+    }
+  }
+
+  async function handleVerifySingleClaim(claimId: string) {
+    try {
+      setVerifyingClaimId(claimId);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch(`/api/projects/${projectId}/claims/${claimId}/verify`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Verification failed");
+
+      setSuccess(`Claim verified: ${json.data.status} (${json.data.ruleDescription})`);
+      await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setVerifyingClaimId(null);
+    }
+  }
+
+  async function handleVerifyAllClaims() {
+    try {
+      setBatchVerifying(true);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch(`/api/projects/${projectId}/verify`, {
+        method: "POST",
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Batch verification failed");
+
+      const s = json.data.summary;
+      setSuccess(
+        `Batch Verification Complete: ${s.verified} Verified, ${s.weakSupport} Weak Support, ${s.conflicting} Conflicting, ${s.unverified} Unverified, ${s.unknown} Unknown (Total: ${s.total})`
+      );
+      await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Batch verification failed");
+    } finally {
+      setBatchVerifying(false);
     }
   }
 
@@ -218,65 +301,161 @@ export default function ClaimsPage({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Failed to save claim edit");
 
+      setSuccess("Claim edited successfully (new version created, review reset to PENDING).");
       setEditingClaim(null);
-      setSuccess("Created updated claim version (review state reset to PENDING).");
-      setTimeout(() => setSuccess(null), 5000);
       await loadData();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to update claim");
+      setError(err instanceof Error ? err.message : "Failed to save claim edit");
     } finally {
       setSavingEdit(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="py-20 flex flex-col items-center justify-center text-muted-foreground">
-        <Loader2 className="h-8 w-8 animate-spin mb-3 text-primary" />
-        <p className="text-sm font-medium">Loading extracted claims...</p>
-      </div>
-    );
+  function renderStatusBadge(latestVerification?: VerificationItem) {
+    if (!latestVerification) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded bg-muted text-muted-foreground px-2 py-0.5 text-xs font-medium">
+          <HelpCircle className="h-3 w-3" /> Unchecked
+        </span>
+      );
+    }
+
+    switch (latestVerification.status) {
+      case "VERIFIED":
+        return (
+          <button
+            onClick={() => setInspectingVerification(latestVerification)}
+            className="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
+            title="Click to inspect 4-gate verification breakdown"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            VERIFIED
+          </button>
+        );
+      case "WEAK_SUPPORT":
+        return (
+          <button
+            onClick={() => setInspectingVerification(latestVerification)}
+            className="inline-flex items-center gap-1 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
+            title="Click to inspect 4-gate verification breakdown"
+          >
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            WEAK SUPPORT
+          </button>
+        );
+      case "CONFLICTING":
+        return (
+          <button
+            onClick={() => setInspectingVerification(latestVerification)}
+            className="inline-flex items-center gap-1 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
+            title="Click to inspect 4-gate verification breakdown"
+          >
+            <AlertCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+            CONFLICTING
+          </button>
+        );
+      case "UNVERIFIED":
+        return (
+          <button
+            onClick={() => setInspectingVerification(latestVerification)}
+            className="inline-flex items-center gap-1 rounded bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
+            title="Click to inspect 4-gate verification breakdown"
+          >
+            <FileQuestion className="h-3.5 w-3.5 text-slate-500" />
+            UNVERIFIED
+          </button>
+        );
+      case "UNKNOWN":
+      default:
+        return (
+          <button
+            onClick={() => setInspectingVerification(latestVerification)}
+            className="inline-flex items-center gap-1 rounded bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
+            title="Click to inspect 4-gate verification breakdown"
+          >
+            <HelpCircle className="h-3.5 w-3.5 text-purple-600" />
+            UNKNOWN
+          </button>
+        );
+    }
   }
 
   if (forbidden) {
     return (
-      <div className="rounded-xl border bg-card p-10 text-center max-w-lg mx-auto my-8 space-y-3">
-        <ShieldAlert className="h-10 w-10 text-amber-500 mx-auto" />
-        <h3 className="text-lg font-bold">Reviewer Permission Required</h3>
-        <p className="text-sm text-muted-foreground">
-          Unapproved extracted candidate claims are restricted to OWNER and REVIEWER roles. VIEWER members can access approved handover snapshots once published.
-        </p>
+      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center text-destructive">
+        <ShieldAlert className="h-10 w-10 mx-auto mb-3 opacity-80" />
+        <h2 className="text-lg font-bold">Access Restricted</h2>
+        <p className="text-sm mt-1">You must be an OWNER or REVIEWER to view unapproved project candidate claims.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Candidate Claims</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Schema-validated AI candidate triples extracted from processed project documents. All values remain PENDING verification and human review.
-        </p>
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Claim Registry & Verification</h1>
+          <p className="text-sm text-muted-foreground">
+            Structured candidate claims extracted from authorized documents, evaluated with 4-gate evidence proof.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            <RotateCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+
+          <button
+            onClick={handleVerifyAllClaims}
+            disabled={batchVerifying || claims.length === 0}
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {batchVerifying ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Verifying All Claims...
+              </>
+            ) : (
+              <>
+                <Play className="h-3.5 w-3.5" />
+                Verify All Claims
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      {success && (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-sm text-emerald-800 dark:text-emerald-300">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span>{success}</span>
-        </div>
-      )}
-
+      {/* Notifications */}
       {error && (
-        <div role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3.5 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>{error}</span>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
-      {/* Filter Bar */}
-      <div className="rounded-xl border bg-card p-4 shadow-sm flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mr-2">
-          <Filter className="h-3.5 w-3.5" /> Filters
+      {success && (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span>{success}</span>
+          </div>
+          <button onClick={() => setSuccess(null)}><X className="h-4 w-4" /></button>
+        </div>
+      )}
+
+      {/* Filters Bar */}
+      <div className="rounded-xl border bg-card p-4 flex flex-wrap items-center gap-3 text-xs">
+        <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+          <Filter className="h-3.5 w-3.5" /> Filters:
         </div>
 
         <select
@@ -290,9 +469,7 @@ export default function ClaimsPage({
         >
           <option value="">All Categories</option>
           {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
+            <option key={c} value={c}>{c}</option>
           ))}
         </select>
 
@@ -307,9 +484,22 @@ export default function ClaimsPage({
         >
           <option value="">All Attributes</option>
           {ATTRIBUTES.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
+            <option key={a} value={a}>{a}</option>
+          ))}
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setPage(1);
+            setStatusFilter(e.target.value);
+          }}
+          className="rounded-md border border-input bg-background px-2.5 py-1.5 text-xs"
+          aria-label="Filter by evidence status"
+        >
+          <option value="">All Evidence Statuses</option>
+          {EVIDENCE_STATUSES.map((s) => (
+            <option key={s} value={s}>{s}</option>
           ))}
         </select>
 
@@ -368,6 +558,9 @@ export default function ClaimsPage({
         <div className="space-y-3">
           {claims.map((claim) => {
             const ev = claim.evidence[0];
+            const latestVerification = claim.verifications?.[0];
+            const isVerifying = verifyingClaimId === claim.id;
+
             return (
               <div
                 key={claim.id}
@@ -411,10 +604,29 @@ export default function ClaimsPage({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Machine Evidence Status */}
+                    {renderStatusBadge(latestVerification)}
+
+                    {/* Human Review State */}
+                    <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded" title="Human Review Decision">
                       v{claim.version} · {claim.reviewState}
                     </span>
+
+                    {/* Verify Single Claim Button */}
+                    <button
+                      onClick={() => handleVerifySingleClaim(claim.id)}
+                      disabled={isVerifying}
+                      className="inline-flex items-center gap-1 rounded border border-emerald-600/30 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 text-xs font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors disabled:opacity-50"
+                    >
+                      {isVerifying ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      )}
+                      {latestVerification ? "Re-verify" : "Verify"}
+                    </button>
+
                     <button
                       onClick={() => openDetail(claim.id)}
                       className="inline-flex items-center gap-1 rounded border px-2.5 py-1 text-xs font-medium hover:bg-muted transition-colors"
@@ -477,61 +689,132 @@ export default function ClaimsPage({
         </div>
       )}
 
-      {/* Claim Detail Modal */}
-      {selectedDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-xl border bg-card shadow-xl overflow-hidden">
-            <div className="flex items-center justify-between border-b px-6 py-4">
-              <div>
-                <h3 className="font-bold text-base">Claim Evidence &amp; Provenance</h3>
-                <p className="text-xs text-muted-foreground">
-                  {selectedDetail.subjectEntity.canonicalName} · {selectedDetail.attributeKey}
-                </p>
+      {/* Proof-Carrying Evidence Gate Breakdown Modal */}
+      {inspectingVerification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-xl border bg-card p-6 shadow-xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                <h3 className="font-bold text-base">Proof-Carrying Verification Gates</h3>
               </div>
-              <button onClick={() => setSelectedDetail(null)} className="rounded p-1 hover:bg-muted">
-                <X className="h-5 w-5" />
+              <button
+                onClick={() => setInspectingVerification(null)}
+                className="rounded p-1 hover:bg-muted text-muted-foreground"
+              >
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="p-6 overflow-y-auto space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 rounded-lg border p-3 bg-muted/20">
-                <div>
-                  <span className="text-muted-foreground block">Normalized Value</span>
-                  <span className="font-semibold">{selectedDetail.valueNormalized ?? "None (needs normalisation)"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Advisory Extractor Confidence</span>
-                  <span className="font-semibold">
-                    {selectedDetail.confidence !== null ? selectedDetail.confidence.toFixed(2) : "N/A"} (advisory only)
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
+                <span className="text-xs font-semibold">Final Evidence Status:</span>
+                {renderStatusBadge(inspectingVerification)}
+              </div>
+
+              {/* Gate 1 */}
+              <div className="rounded-lg border p-3 space-y-1">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span>Gate 1: Source Document Existence</span>
+                  <span className={`px-2 py-0.5 rounded text-[11px] ${inspectingVerification.sourceGate === "PASS" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                    {inspectingVerification.sourceGate}
                   </span>
                 </div>
-                {selectedDetail.extractionRun && (
-                  <>
-                    <div>
-                      <span className="text-muted-foreground block">Extraction Model</span>
-                      <span className="font-mono">{selectedDetail.extractionRun.model}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground block">Prompt / Schema</span>
-                      <span className="font-mono">
-                        {selectedDetail.extractionRun.promptVersion} / {selectedDetail.extractionRun.schemaVersion}
-                      </span>
-                    </div>
-                  </>
+                <p className="text-xs text-muted-foreground">{inspectingVerification.sourceGateReason || "N/A"}</p>
+              </div>
+
+              {/* Gate 2 */}
+              <div className="rounded-lg border p-3 space-y-1">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span>Gate 2: Verbatim / Normalized Quote Existence</span>
+                  <span className={`px-2 py-0.5 rounded text-[11px] ${inspectingVerification.quoteGate === "PASS" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                    {inspectingVerification.quoteGate} {inspectingVerification.quoteSimilarity !== null ? `(${Math.round(inspectingVerification.quoteSimilarity * 100)}%)` : ""}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{inspectingVerification.quoteGateReason || "N/A"}</p>
+              </div>
+
+              {/* Gate 3 */}
+              <div className="rounded-lg border p-3 space-y-1">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span>Gate 3: Independent Semantic Support Judge</span>
+                  <span className="px-2 py-0.5 rounded text-[11px] bg-muted font-mono">
+                    {inspectingVerification.semanticGate || "SKIPPED"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{inspectingVerification.semanticReason || "N/A"}</p>
+                {inspectingVerification.judgeModel && (
+                  <p className="text-[11px] text-muted-foreground/80 font-mono">
+                    Model: {inspectingVerification.judgeModel} · Prompt: {inspectingVerification.judgePromptVersion}
+                  </p>
                 )}
               </div>
 
-              {selectedDetail.evidence.map((ev) => (
-                <div key={ev.id} className="rounded-lg border p-4 space-y-2">
-                  <div className="flex items-center justify-between font-semibold">
-                    <span>
-                      {ev.document.fileName} — {ev.sourceLocation}
-                    </span>
-                    <span className="text-muted-foreground">Chunk #{ev.chunk.chunkIndex + 1}</span>
+              {/* Gate 4 */}
+              <div className="rounded-lg border p-3 space-y-1">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span>Gate 4: Contradiction / Conflict Scan</span>
+                  <span className={`px-2 py-0.5 rounded text-[11px] ${inspectingVerification.contradictionGate === "PASS" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                    {inspectingVerification.contradictionGate === "PASS" ? "NO CONFLICTS" : "OPEN CONFLICT DETECTED"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Active pairwise conflicts detected: {inspectingVerification.contradictionCount}
+                </p>
+              </div>
+
+              <div className="text-[11px] text-muted-foreground text-right pt-2 border-t">
+                Rule set version: {inspectingVerification.ruleSetVersion} · Verified: {new Date(inspectingVerification.verifiedAt).toLocaleString()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inspect Detail Modal */}
+      {selectedDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-xl border bg-card p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-base">Claim Inspection & Provenance</h3>
+              <button
+                onClick={() => setSelectedDetail(null)}
+                className="rounded p-1 hover:bg-muted text-muted-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-2 bg-muted/30 p-3 rounded-lg">
+                <div><strong>Claim ID:</strong> <span className="font-mono">{selectedDetail.id}</span></div>
+                <div><strong>Version:</strong> v{selectedDetail.version}</div>
+                <div><strong>Subject:</strong> {selectedDetail.subjectEntity.canonicalName} ({selectedDetail.subjectEntity.type})</div>
+                <div><strong>Attribute:</strong> {selectedDetail.attributeKey}</div>
+                <div><strong>Value Raw:</strong> {selectedDetail.valueRaw}</div>
+                <div><strong>Value Normalized:</strong> {selectedDetail.valueNormalized || "(none)"}</div>
+                <div><strong>Category:</strong> {selectedDetail.category}</div>
+                <div><strong>Review State:</strong> {selectedDetail.reviewState}</div>
+              </div>
+
+              {selectedDetail.extractionRun && (
+                <div className="rounded-lg border p-3 space-y-1">
+                  <div className="font-semibold text-foreground">Extraction Provenance</div>
+                  <div className="text-muted-foreground">Model: {selectedDetail.extractionRun.model}</div>
+                  <div className="text-muted-foreground">Prompt Version: {selectedDetail.extractionRun.promptVersion}</div>
+                  <div className="text-muted-foreground">Run ID: <span className="font-mono">{selectedDetail.extractionRun.id}</span></div>
+                </div>
+              )}
+
+              {selectedDetail.evidence.map((evItem) => (
+                <div key={evItem.id} className="rounded-lg border p-3 space-y-1 bg-muted/20">
+                  <div className="font-semibold text-foreground">Evidence Excerpt ({evItem.sourceLocation})</div>
+                  <blockquote className="italic border-l-2 border-primary/40 pl-2">
+                    &ldquo;{evItem.excerpt}&rdquo;
+                  </blockquote>
+                  <div className="text-muted-foreground pt-1">
+                    Document: {evItem.document.fileName} · Date basis: {evItem.document.sourceDateBasis}
                   </div>
-                  <p className="font-medium text-primary">Cited excerpt: &ldquo;{ev.excerpt}&rdquo;</p>
-                  <pre className="whitespace-pre-wrap rounded bg-muted/50 p-3 font-mono text-[11px] max-h-60 overflow-y-auto">
-                    {ev.chunk.content}
-                  </pre>
                 </div>
               ))}
             </div>
@@ -539,31 +822,28 @@ export default function ClaimsPage({
         </div>
       )}
 
-      {/* Edit Candidate Claim Modal */}
+      {/* Edit Modal */}
       {editingClaim && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <form
-            onSubmit={handleSaveEdit}
-            className="w-full max-w-md rounded-xl border bg-card shadow-xl p-6 space-y-4"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-base">Edit Candidate Claim (New Version)</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-xl border bg-card p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="font-bold text-base">Edit Claim (Creates New Version)</h3>
               <button
-                type="button"
                 onClick={() => setEditingClaim(null)}
-                className="rounded p-1 hover:bg-muted"
+                className="rounded p-1 hover:bg-muted text-muted-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-sm">
-              <div>
-                <label className="block text-xs font-medium mb-1">Subject Entity</label>
+            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+              <div className="space-y-1.5">
+                <label className="font-semibold">Subject Entity</label>
                 <select
                   value={editSubjectId}
                   onChange={(e) => setEditSubjectId(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-xs"
+                  required
                 >
                   {entities.map((en) => (
                     <option key={en.id} value={en.id}>
@@ -573,66 +853,64 @@ export default function ClaimsPage({
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium mb-1">Category</label>
-                <select
-                  value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium mb-1">Controlled Attribute Key</label>
+              <div className="space-y-1.5">
+                <label className="font-semibold">Attribute Key</label>
                 <select
                   value={editAttributeKey}
                   onChange={(e) => setEditAttributeKey(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-xs"
+                  required
                 >
                   {ATTRIBUTES.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
+                    <option key={a} value={a}>{a}</option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium mb-1">Value</label>
+              <div className="space-y-1.5">
+                <label className="font-semibold">Value (Raw)</label>
                 <input
                   type="text"
-                  required
                   value={editValueRaw}
                   onChange={(e) => setEditValueRaw(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-xs"
+                  required
                 />
               </div>
-            </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setEditingClaim(null)}
-                className="rounded-md border px-3 py-1.5 text-xs font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={savingEdit}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                {savingEdit && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Save Version
-              </button>
-            </div>
-          </form>
+              <div className="space-y-1.5">
+                <label className="font-semibold">Category</label>
+                <select
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-xs"
+                  required
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setEditingClaim(null)}
+                  className="rounded-md border px-4 py-2 hover:bg-muted font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="rounded-md bg-primary text-primary-foreground px-4 py-2 font-medium hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {savingEdit && <Loader2 className="h-3 w-3 animate-spin" />}
+                  Save New Version
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -13,7 +13,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "baseline:dev": "tsx scripts/run-baseline-dev.ts"
+    "baseline:dev": "tsx scripts/run-baseline-dev.ts",
+    "eval:verify-dev": "tsx scripts/eval/verify-dev.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

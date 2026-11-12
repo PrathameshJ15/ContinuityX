@@ -1,4 +1,4 @@
-import { ClaimCategory, Prisma, ReviewState } from "@prisma/client";
+import { ClaimCategory, EvidenceStatus, Prisma, ReviewState } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireProjectAccess } from "@/lib/permissions";
 import { writeAudit } from "@/lib/audit";
@@ -15,6 +15,7 @@ export interface ListClaimsFilters {
   injectionFlag?: boolean;
   needsNormalization?: boolean;
   reviewState?: ReviewState;
+  evidenceStatus?: EvidenceStatus;
   latestOnly?: boolean;
 }
 
@@ -39,6 +40,13 @@ export async function listClaimsService(
   if (typeof filters.injectionFlag === "boolean") where.injectionFlag = filters.injectionFlag;
   if (filters.needsNormalization === true) where.valueNormalized = null;
   if (filters.reviewState) where.reviewState = filters.reviewState;
+  if (filters.evidenceStatus) {
+    where.verifications = {
+      some: {
+        status: filters.evidenceStatus,
+      },
+    };
+  }
   if (filters.documentId) {
     where.evidence = { some: { documentId: filters.documentId } };
   }
@@ -76,6 +84,10 @@ export async function listClaimsService(
             },
           },
         },
+        verifications: {
+          orderBy: { verifiedAt: "desc" },
+          take: 1,
+        },
       },
     }),
   ]);
@@ -103,6 +115,10 @@ export async function getClaimService(
     include: {
       subjectEntity: {
         include: { aliases: true },
+      },
+      verifications: {
+        orderBy: { verifiedAt: "desc" },
+        take: 5,
       },
       extractionRun: {
         select: {

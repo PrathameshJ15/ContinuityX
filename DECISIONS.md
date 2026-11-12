@@ -87,6 +87,15 @@ These resolve ambiguities in the locked V3.1 documents. They add no P0-A feature
 - [2026-11-12] | Conservative Entity Disambiguation with Review Flagging (autonomous) | In entity resolution, if multiple potential matches exist or similarity is ambiguous (< 0.85 threshold), system creates a new entity and flags `needsReview = true` instead of guessing. Rejected: aggressive fuzzy auto-merging. | Protects project knowledge graph from false merges while allowing human reviewers to execute clean merges via `mergeEntitiesService`.
 - [2026-11-12] | Extraction Caching by Deterministic Input Checksum (autonomous) | Keyed `ExtractionRun` on `(inputChecksum, promptVersion, model, schemaVersion)`. If identical document content is extracted with the same model parameters, previous results can be reused or audited. | Saves API calls and provides transparent provenance tracking.
 
+---
+
+## Phase 4 Autonomous Decisions
+
+- [2026-11-12] | Deterministic V3.2 Evidence-Status Algorithm (autonomous) | Implemented the authoritative 9-row first-match decision table (`src/services/verification/algorithm.ts`). Status is derived strictly from gate results and deterministic rules, never model confidence. Rejected: deriving verification status from LLM confidence scores or fuzzy thresholds. | Hallucination traps and fabricated quotes are deterministically blocked from reaching `VERIFIED`.
+- [2026-11-12] | Independent Semantic Judge Isolation & Temperature 0 (autonomous) | The semantic judge (`GEMINI_JUDGE_MODEL` / `gemini-3.5-flash`) receives strictly the claim triple `(subject, attribute, value)`, the cited excerpt enclosed in untrusted tags, and minimal location context. The judge is never passed the full document, other claims, or extractor confidence, and runs at temperature 0 with a 1-retry fallback. | Ensures semantic evaluations are reproducible and resilient to prompt injection.
+- [2026-11-12] | Canonical Pairwise Conflict Ordering (autonomous) | Enforced canonical ID ordering `(claimAId < claimBId)` with a database unique index `[claimAId, claimBId]` on the `Conflict` model, paired with date basis analysis (`sourceDateBasis != UNKNOWN` sets `POSSIBLY_SUPERSEDED`, otherwise `OPEN`). Rejected: storing unordered or duplicate reciprocal conflict rows. | Eliminates duplicate reciprocal conflict records and prevents unsupported auto-supersession assumptions without human review.
+
+
 
 
 

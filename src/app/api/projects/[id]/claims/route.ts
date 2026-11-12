@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { ClaimCategory, ReviewState } from "@prisma/client";
+import { ClaimCategory, EvidenceStatus, ReviewState } from "@prisma/client";
 import { listClaimsService } from "@/services/claims";
 import { jsonSuccess, handleApiError } from "@/lib/api-response";
 
@@ -22,6 +22,7 @@ export async function GET(
     const injectionFlagParam = searchParams.get("injectionFlag");
     const needsNormParam = searchParams.get("needsNormalization");
     const reviewStateParam = searchParams.get("reviewState");
+    const evidenceStatusParam = searchParams.get("evidenceStatus");
 
     const category =
       categoryParam && Object.values(ClaimCategory).includes(categoryParam as ClaimCategory)
@@ -31,6 +32,12 @@ export async function GET(
     const reviewState =
       reviewStateParam && Object.values(ReviewState).includes(reviewStateParam as ReviewState)
         ? (reviewStateParam as ReviewState)
+        : undefined;
+
+    const evidenceStatus =
+      evidenceStatusParam &&
+      Object.values(EvidenceStatus).includes(evidenceStatusParam as EvidenceStatus)
+        ? (evidenceStatusParam as EvidenceStatus)
         : undefined;
 
     const result = await listClaimsService(projectId, {
@@ -48,6 +55,7 @@ export async function GET(
             : undefined,
       needsNormalization: needsNormParam === "true" ? true : undefined,
       reviewState,
+      evidenceStatus,
     });
 
     return jsonSuccess(result);
