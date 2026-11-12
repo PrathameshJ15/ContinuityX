@@ -74,6 +74,8 @@ interface QAMessage {
   text: string;
   supported?: boolean;
   citations?: QACitation[];
+  error?: boolean;
+  failedQuestion?: string;
   timestamp: string;
 }
 
@@ -142,12 +144,17 @@ export default function ContinuityIntelligencePage({
     setAsking(true);
     setError(null);
 
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), 30000);
+
     try {
       const res = await fetch(`/api/projects/${projectId}/qa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: textToAsk }),
+        signal: timeoutController.signal,
       });
+      clearTimeout(timeoutId);
 
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Q&A query failed");
@@ -163,7 +170,27 @@ export default function ContinuityIntelligencePage({
 
       setChatHistory((prev) => [...prev, reply]);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to answer question");
+      clearTimeout(timeoutId);
+      const isAbort =
+        err instanceof Error &&
+        (err.name === "AbortError" || err.message.toLowerCase().includes("aborted"));
+      const errorMessage = isAbort
+        ? "Request timed out after 30 seconds. The server took too long to retrieve or generate an answer."
+        : err instanceof Error
+        ? err.message
+        : "Failed to answer question";
+
+      const errorReply: QAMessage = {
+        id: `assistant-error-${Date.now()}`,
+        sender: "assistant",
+        text: errorMessage,
+        supported: false,
+        error: true,
+        failedQuestion: textToAsk,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+
+      setChatHistory((prev) => [...prev, errorReply]);
     } finally {
       setAsking(false);
     }
@@ -604,10 +631,39 @@ export default function ContinuityIntelligencePage({
                         className={`max-w-2xl rounded-2xl p-4 text-xs space-y-3 ${
                           msg.sender === "user"
                             ? "bg-primary text-primary-foreground rounded-br-none"
+                            : msg.error
+                            ? "bg-rose-50 dark:bg-rose-950/20 border border-rose-300 dark:border-rose-900 text-rose-900 dark:text-rose-200 rounded-bl-none"
                             : "bg-muted/40 border text-foreground rounded-bl-none"
                         }`}
                       >
-                        <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                        {msg.error ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 font-semibold text-rose-700 dark:text-rose-400">
+                              <AlertCircle className="h-4 w-4 shrink-0" />
+                              <span>Q&A Query Error</span>
+                            </div>
+                            <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                            {msg.failedQuestion && (
+                              <button
+                                onClick={() => handleAskQuestion(msg.failedQuestion)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md bg-rose-600 hover:bg-rose-700 text-white transition-colors mt-2"
+                              >
+                                <RotateCw className="h-3 w-3" />
+                                Retry Question
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            {msg.sender === "assistant" && msg.supported === false && (
+                              <div className="inline-flex items-center gap-1.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-[11px] font-semibold mb-1">
+                                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                                Refusal: Unverified in Approved Evidence
+                              </div>
+                            )}
+                            <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                          </>
+                        )}
 
                         {/* Citations Box */}
                         {msg.citations && msg.citations.length > 0 && (
