@@ -19,31 +19,62 @@ enum ProjectRole {
   VIEWER
 }
 
+enum TextQuality {
+  OK
+  LOW_TEXT
+  SCANNED_SUSPECTED
+}
+
+enum SourceDateBasis {
+  USER_PROVIDED
+  CONTENT_EXPLICIT
+  UNKNOWN
+}
+
+enum DocumentProcessingStatus {
+  UPLOADED
+  VALIDATING
+  EXTRACTING
+  CHUNKING
+  READY_FOR_AI
+  VALIDATION_FAILED
+  EXTRACTION_FAILED
+}
+
+enum ProcessingJobState {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
 model User {
-  id           String          @id @default(cuid())
-  name         String
-  email        String          @unique
-  passwordHash String
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  memberships  ProjectMember[]
-  createdProjects Project[]    @relation("ProjectCreator")
-  auditLogs    AuditLog[]
+  id              String          @id @default(cuid())
+  name            String
+  email           String          @unique
+  passwordHash    String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  memberships     ProjectMember[]
+  createdProjects Project[]       @relation("ProjectCreator")
+  uploadedDocuments Document[]
+  auditLogs       AuditLog[]
 
   @@index([email])
 }
 
 model Project {
-  id          String         @id @default(cuid())
-  name        String
-  description String?
-  status      ProjectStatus  @default(ACTIVE)
-  createdBy   String
-  createdByUser User         @relation("ProjectCreator", fields: [createdBy], references: [id], onDelete: Restrict)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  members     ProjectMember[]
-  auditLogs   AuditLog[]
+  id            String          @id @default(cuid())
+  name          String
+  description   String?
+  status        ProjectStatus   @default(ACTIVE)
+  createdBy     String
+  createdByUser User            @relation("ProjectCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  members       ProjectMember[]
+  documents     Document[]
+  auditLogs     AuditLog[]
 
   @@index([createdBy])
   @@index([status])
@@ -63,6 +94,69 @@ model ProjectMember {
   @@index([userId])
   @@index([projectId])
   @@index([role])
+}
+
+model Document {
+  id               String                   @id @default(cuid())
+  projectId        String
+  project          Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy       String
+  uploadedByUser   User                     @relation(fields: [uploadedBy], references: [id], onDelete: Restrict)
+  fileName         String
+  mimeType         String
+  storageKey       String
+  fileSize         Int
+  checksum         String                   // SHA-256 hash of raw file
+  pageCount        Int                      @default(1)
+  textQuality      TextQuality              @default(OK)
+  sourceDate       DateTime?
+  sourceDateBasis  SourceDateBasis          @default(UNKNOWN)
+  processingStatus DocumentProcessingStatus @default(UPLOADED)
+  deletedAt        DateTime?
+  uploadedAt       DateTime                 @default(now())
+  chunks           DocumentChunk[]
+  processingJobs   ProcessingJob[]
+
+  @@index([projectId, checksum])
+  @@index([projectId])
+  @@index([uploadedBy])
+  @@index([processingStatus])
+  @@index([deletedAt])
+  @@index([uploadedAt])
+}
+
+model DocumentChunk {
+  id           String    @id @default(cuid())
+  documentId   String
+  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkIndex   Int
+  content      String    @db.Text
+  pageNumber   Int?
+  sectionTitle String?
+  rowStart     Int?
+  rowEnd       Int?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+
+  @@index([documentId, chunkIndex])
+  @@index([pageNumber])
+}
+
+model ProcessingJob {
+  id             String             @id @default(cuid())
+  documentId     String
+  document       Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  state          ProcessingJobState @default(PENDING)
+  attempts       Int                @default(0)
+  lastError      String?
+  stepData       Json?
+  leaseExpiresAt DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([documentId])
+  @@index([state])
+  @@index([leaseExpiresAt])
 }
 
 model AuditLog {

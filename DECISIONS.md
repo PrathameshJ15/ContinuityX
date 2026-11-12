@@ -69,4 +69,14 @@ These resolve ambiguities in the locked V3.1 documents. They add no P0-A feature
 - [2026-11-12] | Authoritative Typed Permission Matrix (autonomous) | Defined PERMISSION_MATRIX as a single immutable typed constant mapping all domain actions to allowed ProjectRole enums (OWNER, REVIEWER, VIEWER). Rejected: distributed in-route permission checks (prone to drift and omission). | Matrix is 100% testable; unit tests are generated dynamically across every role-permission pair.
 - [2026-11-12] | Last-OWNER Invariant Safeguard (autonomous) | Both changeMemberRoleService() and removeMemberService() enforce that an OWNER cannot be demoted or removed if ownerCount <= 1. Rejected: client-side-only checks or allowing orphaned projects without owners. | Prevents unmanageable orphaned project workspaces.
 
+---
+
+## Phase 2 Autonomous Decisions
+
+- [2026-11-12] | Document Parser Selection behind DocumentParser Interface (autonomous) | Selected `unpdf` (PDF page extraction), `mammoth` (DOCX HTML heading + paragraph structure), and `papaparse` (CSV batch parsing) with `jszip` inspecting `word/document.xml`. Rejected: `pdf-parse` (legacy CJS/worker packaging issues in Next.js 15 bundles). | Reliable pure-JS extraction inside Next.js App Router and serverless bundles with zero native binaries.
+- [2026-11-12] | Intermediate Step State Persistence in ProcessingJob.stepData (autonomous) | Persist parsed `segments` JSON transiently in `ProcessingJob.stepData` between the `EXTRACTING` and `CHUNKING` steps and clear it on `READY_FOR_AI` (falling back to re-parse if missing). Rejected: running extraction and chunking in one long blocking request. | Keeps every processing API call short, resumable, idempotent, and protected by 30s lease locks.
+- [2026-11-12] | Configurable Upload & Processing Caps via Environment Variables (autonomous) | Exposed `MAX_DOCUMENT_SIZE_MB` (default 10 MB), `MAX_DOCUMENT_PAGES` (default 100), and `MAX_PROJECT_DOCUMENTS` (default 50) in `src/lib/env.ts` / `.env.example`. Rejected: unconfigurable hard-coded magic numbers or unlimited uploads. | Prevents memory exhaustion and abuse while remaining adjustable per environment.
+- [2026-11-12] | Strict Source Date Preservation (`USER_PROVIDED` vs `UNKNOWN`) (autonomous) | Optional user-supplied upload date records `sourceDateBasis = USER_PROVIDED`; omitted dates leave `sourceDate = null` and `sourceDateBasis = UNKNOWN`. Rejected: inferring `sourceDate` from OS file timestamps or `uploadedAt`. | Enforces V3.2 temporal integrity rule so Phase 5 never infers supersession without reliable dates.
+
+
 

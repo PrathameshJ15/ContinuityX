@@ -1,0 +1,4 @@
+Task ID,Component,Status,Owner,Due Date,Notes
+T-101,login service,IN_PROGRESS,Arjun Mehta,2026-02-01,"Still fixing token refresh edge case"
+T-102,RFID Scanner Gateway,NOT_STARTED,,2026-02-10,"Unassigned hardware integration task"
+T-103,Reporting Dashboard,BLOCKED,Riya Sharma,2026-02-15,"Depends on Backend API completion"

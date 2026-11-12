@@ -6,8 +6,8 @@ Update at the end of every phase and every work session. Status comes from the r
 |---|---|---|---|---|---|
 | 0 | Repository Audit & Foundation | Done | Yes | 2026-11-12 | Foundation scaffolded, typecheck/lint/tests/build passing, 5 decisions recorded |
 | 1 | Authentication & Project Workspace | Done | Yes | 2026-11-12 | Auth, User/Project/ProjectMember/AuditLog, permission matrix (61 tests pass) |
-| 2 | Document Intelligence & Upload | In progress | No | 2026-11-12 | Starting Phase 2 planning & implementation |
-| 3 | AI Claim Extraction & Entity Registry | Not started | No | | |
+| 2 | Document Intelligence & Upload | Done | Yes | 2026-11-12 | Live Neon migration applied & seeded; validation, parsers, chunking, DEV dataset, 95 tests pass |
+| 3 | AI Claim Extraction & Entity Registry | In progress | No | 2026-11-12 | Step 1 Inspect & Plan submitted for review |
 | 4 | Proof-Carrying Verification Engine | Not started | No | | |
 | 5 | Conflict Detection & Human Review | Not started | No | | |
 | 6 | Handover Generation & SHA-256 Receipt | Not started | No | | |
@@ -91,4 +91,52 @@ All project routes and server actions strictly enforce permissions on the server
 - `POST /api/projects/[id]/members`: Calls `requireProjectAccess(projectId, "members:manage")`.
 - `PATCH /api/projects/[id]/members/[memberId]`: Calls `requireProjectAccess(projectId, "members:manage")`.
 - `DELETE /api/projects/[id]/members/[memberId]`: Calls `requireProjectAccess(projectId, "members:manage")`.
+
+---
+
+## Phase 2 Standard Phase Report
+
+### 1. What was built
+- **Database Models & Migration (`prisma/migrations/20261112121635_init_phase1_phase2`):** Applied `Document`, `DocumentChunk`, `ProcessingJob`, and enums `TextQuality`, `SourceDateBasis`, `DocumentProcessingStatus`, `ProcessingJobState` to Neon PostgreSQL; ran `npm run db:seed` cleanly (`cmwdiir940003t1c4i0b29dtg`).
+- **Private Storage (`src/lib/storage.ts`):** `StorageProvider` interface and `LocalStorageProvider` writing under `storage/documents/` outside `public/` with path-traversal protection and authenticated proxy download.
+- **Validation (`src/services/documents/validation.ts`):** Extension + MIME allowlist, `%PDF` magic bytes, ZIP + `word/document.xml` DOCX inspection via `JSZip`, UTF-8/UTF-16 BOM & binary null-byte CSV decoding, size/page/project caps, SHA-256 checksum deduplication.
+- **Parsers & Quality (`src/services/documents/parsers.ts`):** Modular `DocumentParser` implementations for PDF (`unpdf`), DOCX (`mammoth`), and CSV (`papaparse`); deterministic `evaluateTextQuality()` (`OK`, `LOW_TEXT`, `SCANNED_SUSPECTED`); explicit password-protected PDF detection; zero invented headings/locations.
+- **Structure-Aware Chunking (`src/services/documents/chunking.ts`):** `createStructureAwareChunks()` preserving verbatim text and true page/heading/row boundaries.
+- **Step-Wise Idempotent Pipeline & API (`src/services/documents/index.ts`, `/api/projects/[id]/documents/*`):** `UPLOADED/VALIDATING -> EXTRACTING -> CHUNKING -> READY_FOR_AI` with 30s lease locks, `VALIDATION_FAILED`/`EXTRACTION_FAILED` recovery + `retry`, `USER_PROVIDED` vs `UNKNOWN` source dates, soft delete, and `requireProjectAccess` checks on all routes (`upload`, `list`, `get`, `process`, `retry`, `download`, `delete`).
+- **UI (`src/app/projects/[projectId]/layout.tsx`, `src/app/projects/[projectId]/documents/page.tsx`):** Documents tab with upload dropzone, optional source date input, status stepper, text-quality warnings, chunk inspection modal, authenticated download, retry, and soft delete.
+- **DEV Demo Dataset & Baseline Script (`scripts/generate-dev-dataset.ts`, `demo-data/dev/*`, `demo-data/dev-malformed/*`, `scripts/run-baseline-dev.ts`):** Reproducible 5-file DEV set (`design_doc.pdf`, `meeting_notes.docx`, `task_tracker.csv`, `chat_export.docx`, `scanned_notes.pdf`) + `ground_truth.json` (cases C1-C5, H1-H3, W1, A1-A2, I1, S1, M1) + malformed fixtures + baseline runner script (`npm run baseline:dev`).
+
+### 2. Commands run and their real results
+- `npx prisma migrate dev --name init_phase1_phase2`: Exit code 0 (created and applied migration to Neon Postgres).
+- `npm run db:seed`: Exit code 0 (seeded demo accounts and synthetic project `cmwdiir940003t1c4i0b29dtg`).
+- `npx tsx scripts/run-baseline-dev.ts`: Exit code 0 (parsed 5 DEV files cleanly; skipped Gemini call with explicit message `[Baseline] Skipped: GEMINI_API_KEY is not configured.`).
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` 0 errors).
+- `npm test`: Exit code 0 (95 passed across 9 test suites, including 12 validation tests, 13 parser/chunking/DEV fixture tests, and 9 document service & authorization tests).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm run build`: Exit code 0 (22 routes compiled cleanly).
+
+### 3. Exit-criteria checklist
+- [x] PDF, DOCX and CSV upload, extract and persist with correct source locations — **PASS**
+- [x] Validation and failure handling work with clear user messages — **PASS**
+- [x] Duplicates are caught; document date is stored with its basis — **PASS**
+- [x] Low-text or scanned files are flagged for human attention — **PASS**
+- [x] Processing status is visible and retry works — **PASS**
+- [x] Files are private; no public URLs — **PASS**
+- [x] DEV dataset and `ground_truth.json` exist — **PASS**
+- [~] Baseline result saved (or explicitly skipped with a reason) — **SKIPPED cleanly** (no `GEMINI_API_KEY` configured yet; ready to run via `npm run baseline:dev`)
+- [x] typecheck, lint, tests and build pass — **PASS**
+
+### 4. Deviations and DECISIONS.md entries
+- Added 4 Phase 2 entries in `DECISIONS.md` (`unpdf`/`mammoth`/`papaparse`, `ProcessingJob.stepData`, env-configurable upload caps, `USER_PROVIDED`/`UNKNOWN` date preservation).
+
+### 5. Security confirmation: Document routes enforcement
+Every document route enforces server-side auth & membership (`requireProjectAccess` with unified 404 for missing/non-member projects):
+- `GET /api/projects/[id]/documents`: `project:read` (OWNER, REVIEWER, VIEWER)
+- `GET /api/projects/[id]/documents/[docId]`: `project:read` (OWNER, REVIEWER, VIEWER)
+- `GET /api/projects/[id]/documents/[docId]/download`: `project:read` (OWNER, REVIEWER, VIEWER), private `Cache-Control: private, no-cache, no-store, must-revalidate`
+- `POST /api/projects/[id]/documents/upload`: `documents:upload_or_delete` (OWNER, REVIEWER only)
+- `POST /api/projects/[id]/documents/[docId]/process`: `documents:upload_or_delete` (OWNER, REVIEWER only)
+- `POST /api/projects/[id]/documents/[docId]/retry`: `documents:upload_or_delete` (OWNER, REVIEWER only)
+- `DELETE /api/projects/[id]/documents/[docId]`: `documents:upload_or_delete` (OWNER, REVIEWER only)
+
 

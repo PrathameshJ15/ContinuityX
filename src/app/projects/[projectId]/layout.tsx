@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Users,
   LayoutDashboard,
+  FileText,
   Loader2,
   AlertOctagon,
 } from "lucide-react";
@@ -110,6 +111,12 @@ export default function ProjectWorkspaceLayout({
       href: `/projects/${projectId}`,
       icon: LayoutDashboard,
       active: pathname === `/projects/${projectId}`,
+    },
+    {
+      name: "Documents",
+      href: `/projects/${projectId}/documents`,
+      icon: FileText,
+      active: pathname.startsWith(`/projects/${projectId}/documents`),
     },
     {
       name: "Members & Settings",
