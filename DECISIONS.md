@@ -95,6 +95,16 @@ These resolve ambiguities in the locked V3.1 documents. They add no P0-A feature
 - [2026-11-12] | Independent Semantic Judge Isolation & Temperature 0 (autonomous) | The semantic judge (`GEMINI_JUDGE_MODEL` / `gemini-3.5-flash`) receives strictly the claim triple `(subject, attribute, value)`, the cited excerpt enclosed in untrusted tags, and minimal location context. The judge is never passed the full document, other claims, or extractor confidence, and runs at temperature 0 with a 1-retry fallback. | Ensures semantic evaluations are reproducible and resilient to prompt injection.
 - [2026-11-12] | Canonical Pairwise Conflict Ordering (autonomous) | Enforced canonical ID ordering `(claimAId < claimBId)` with a database unique index `[claimAId, claimBId]` on the `Conflict` model, paired with date basis analysis (`sourceDateBasis != UNKNOWN` sets `POSSIBLY_SUPERSEDED`, otherwise `OPEN`). Rejected: storing unordered or duplicate reciprocal conflict rows. | Eliminates duplicate reciprocal conflict records and prevents unsupported auto-supersession assumptions without human review.
 
+---
+
+## Phase 5 Autonomous Decisions
+
+- [2026-11-12] | Optimistic Concurrency via Integer Versioning on Candidate Claims (autonomous) | `Claim.version` is incremented on every edit and checked atomically during human review actions (`expectedVersion`). If `claim.version !== expectedVersion`, the API rejects with HTTP 409 Conflict. Rejected: last-write-wins or unversioned review submissions. | Prevents silent reviewer overwrites in multi-user concurrent review sessions.
+- [2026-11-12] | Mandatory Written Rationale for Non-VERIFIED Claim Acceptance (autonomous) | While `VERIFIED` claims can be accepted directly, any claim with verification status `WEAK_SUPPORT`, `CONTRADICTED`, `UNVERIFIED`, or `FLAGGED` strictly requires a non-empty `reason` in both UI and API (HTTP 400 if missing), which is permanently recorded in `ReviewAction.reason` and `AuditLog`. Rejected: silent override without written justification. | Enforces transparent auditability when human reviewers exercise domain judgment over weak evidence.
+- [2026-11-12] | Strict Co-Ownership Restriction for `KEEP_BOTH` Conflict Resolution (autonomous) | `KEEP_BOTH` (`RESOLVED_MUTUAL_ACCEPT`) is restricted strictly to multi-cardinality attributes (`attributeKey === 'owner'`), asserting co-ownership. For single-cardinality attributes (e.g. `status`, `selected_technology`), `KEEP_BOTH` is rejected with HTTP 400. Rejected: allowing mutual acceptance of contradictory single-valued statuses. | Guarantees semantic consistency in resolved claim sets.
+- [2026-11-12] | Review Queue Ordering with Conflict Blocking (autonomous) | The human review queue prioritizes claims with open conflicts first, followed by unverified/weak claims, and blocks acceptance of any claim with an active `OPEN` conflict until the conflict is resolved. Rejected: allowing acceptance of conflicting claims before resolving the dispute. | Guarantees that conflicting assertions cannot bypass resolution into an approved handover.
+
+
 
 
 

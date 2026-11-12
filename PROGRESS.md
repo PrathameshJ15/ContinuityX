@@ -9,7 +9,7 @@ Update at the end of every phase and every work session. Status comes from the r
 | 2 | Document Intelligence & Upload | Done | Yes | 2026-11-12 | Live Neon migration applied & seeded; validation, parsers, chunking, DEV dataset, 95 tests pass |
 | 3 | AI Claim Extraction & Entity Registry | Done | Yes | 2026-11-12 | Extraction pipeline, entity registry, vocabulary normalization, injection defense, 114 tests pass |
 | 4 | Proof-Carrying Verification Engine | Done | Yes | 2026-11-12 | 4-gate verification engine, SPEC.md V3.2 9-row status table, DEV eval 15/15 matched, 148 tests pass |
-| 5 | Conflict Detection & Human Review | In progress | No | 2026-11-12 | Conflict models & pairwise detection implemented; building split-pane review & resolution flows |
+| 5 | Conflict Detection & Human Review | Done | Yes | 2026-11-12 | Conflict models, resolution engine, split-pane review, review queue, 159 tests pass |
 | 6 | Handover Generation & SHA-256 Receipt | Not started | No | | |
 | 7 | Knowledge Loss Radar | Not started | No | | |
 | 8 | Continuity Intelligence | Not started | No | | |
@@ -273,12 +273,88 @@ Every route strictly calls `requireProjectAccess` enforcing server-side permissi
   - `[2026-11-12] | Independent Semantic Judge Isolation & Temperature 0`
   - `[2026-11-12] | Canonical Pairwise Conflict Ordering`
 
-### 5. Security confirmation: Verification and Conflict routes enforcement
-All verification and conflict routes strictly call `requireProjectAccess` enforcing server-side permission checks:
-- `POST /api/projects/[id]/verify`: `ai:run_extraction_verification` (OWNER, REVIEWER)
-- `POST /api/projects/[id]/claims/[claimId]/verify`: `ai:run_extraction_verification` (OWNER, REVIEWER)
-- `GET /api/projects/[id]/claims/[claimId]/verification`: `claims:view_unapproved` (OWNER, REVIEWER)
-- `GET /api/projects/[id]/conflicts`: `claims:view_unapproved` (OWNER, REVIEWER)
+---
+
+## Phase 5 Standard Phase Report
+
+### 1. What was built
+- **Database Models & Enums:**
+  - `Review` model (`id`, `claimId`, `state`, `assigneeId`, `priority`, `createdAt`, `updatedAt`).
+  - `ReviewAction` model (`id`, `reviewId`, `claimId`, `reviewerId`, `action`, `previousState`, `newState`, `reason`, `comments`, `createdAt`).
+  - `ConflictResolutionState` enums: Added `REQUIRES_CLARIFICATION` and `UNDER_REVIEW`.
+  - Prisma migrations deployed to Neon PostgreSQL: `20261112180000_init_phase5_reviews_actions` and `20261112182000_conflict_resolution_enums`.
+- **Conflict Resolution Service (`src/services/conflicts/index.ts`):**
+  - `listConflictsService()` with status filtering, relation inclusions (claimA, claimB, subjectEntity, evidence, source docs, resolvingUser).
+  - `getConflictService()` with permission validation.
+  - `resolveConflictService()` handling all 5 actions:
+    - `CHOOSE_A`: Accepts Claim A, rejects Claim B, marks conflict `RESOLVED_ONE_ACCEPTED`.
+    - `CHOOSE_B`: Accepts Claim B, rejects Claim A, marks conflict `RESOLVED_ONE_ACCEPTED`.
+    - `KEEP_BOTH`: Mutually accepts both claims only if `attributeKey === 'owner'`, marks conflict `RESOLVED_MUTUAL_ACCEPT`. Rejects for single-valued attributes.
+    - `CONFIRM_SUPERSEDED`: Accepts newer Claim B, rejects older Claim A, marks conflict `RESOLVED_ONE_ACCEPTED`.
+    - `REQUIRES_CLARIFICATION`: Marks conflict `REQUIRES_CLARIFICATION`, sets claims to `NEEDS_CLARIFICATION`.
+    - Enforces written reasoning, records `ReviewAction` audit trail, and triggers claim re-verification.
+- **Review Queue Service (`src/services/reviews/index.ts`):**
+  - Priority-ranked queue: Prioritizes claims with open conflicts, followed by unverified/weak claims.
+  - Optimistic concurrency: Enforces `claim.version === expectedVersion` (HTTP 409 if mismatched).
+  - Conflict blocking: Prohibits accepting any claim currently participating in an `OPEN` conflict (HTTP 400).
+  - Mandatory reasoning: Prohibits accepting any non-`VERIFIED` claim (`WEAK_SUPPORT`, `UNVERIFIED`, `CONTRADICTED`, `FLAGGED`) without a written reason (HTTP 400).
+  - Rejection cascades: Rejection sets `reviewState = REJECTED` and cancels open conflicts.
+- **Claim Edit Integration (`src/services/claims/index.ts`):**
+  - `editCandidateClaimService()` increments `claim.version`, resets review state, re-runs 4-gate verification, and scans for conflicts against other active claims.
+- **API Endpoints:**
+  - `GET /api/projects/[id]/conflicts`: List conflicts with optional `?status=` query filter.
+  - `GET /api/projects/[id]/conflicts/[conflictId]`: Retrieve detailed conflict record.
+  - `POST /api/projects/[id]/conflicts/[conflictId]/resolve`: Resolve conflict with action and reason.
+  - `GET /api/projects/[id]/review/queue`: Retrieve ranked review queue with open conflict and verification stats.
+  - `POST /api/projects/[id]/claims/[claimId]/review`: Submit review decision with version check and mandatory non-VERIFIED reasoning.
+- **UI Screens & Interactions:**
+  - **Conflict Management Page (`/projects/[projectId]/conflicts`):**
+    - Side-by-side comparison of Claim A vs Claim B, highlighting value differences, source document names, and quoted excerpts.
+    - Prominent banner when chronology is unknown due to missing source dates: *"Chronology unknown: At least one source document lacks a reliable date. Verify chronology manually before superseding."*
+    - Interactive resolution modal with action selector, reason input, and co-ownership validation.
+  - **Split-Pane Evidence Review Page (`/projects/[projectId]/review`):**
+    - Left pane: Claim triple `(subject, attribute, value)`, review state badge, 4-gate verification breakdown, open conflict alerts, and review history timeline.
+    - Right pane: Full document context chunk with verbatim quoted excerpt highlighted in yellow.
+    - Keyboard shortcuts: `A` (Accept), `R` (Reject), `N` (Next claim), `P` (Previous claim).
+    - Non-VERIFIED acceptance reason modal: Prominently requires written explanation before allowing acceptance of weak or unverified claims.
+  - **Workspace Shell Navigation:** Added `Conflicts` and `Evidence Review` tabs to project workspace layout.
+
+### 2. Commands run and their real results
+- `npx prisma migrate deploy`: Exit code 0 (applied migrations `20261112180000` and `20261112182000` to remote Neon PostgreSQL).
+- `npx prisma generate`: Exit code 0 (Prisma Client regenerated with Phase 5 models).
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm test`: Exit code 0 (159 tests passed across 18 test suites, including 11 new integration tests in `tests/integration/reviews-conflicts-service.test.ts`).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm run build`: Exit code 0 (Next.js production build succeeded for all 40 routes).
+
+### 3. Exit-criteria checklist
+- [x] Conflicts are detected across documents and shown side-by-side — **PASS**
+- [x] Chronology rule is enforced; unknown dates never silently auto-supersede — **PASS**
+- [x] Reviewer can accept, reject, edit and resolve conflicts with a reason — **PASS**
+- [x] Reason is strictly required for non-VERIFIED acceptance — **PASS** (enforced in service and UI)
+- [x] Accepted claim cannot stay in an OPEN conflict — **PASS** (blocked by review service)
+- [x] Every review action is attributed, timestamped and audit-logged — **PASS** (`ReviewAction` & `writeAudit`)
+- [x] Optimistic concurrency protects against concurrent reviewer overwrites — **PASS** (`claim.version` checks)
+- [x] Split-pane review highlights source context alongside the claim — **PASS**
+- [x] typecheck, lint, tests and build pass — **PASS**
+
+### 4. Deviations and DECISIONS.md entries
+- Added 4 Phase 5 entries in `DECISIONS.md`:
+  - `[2026-11-12] | Optimistic Concurrency via Integer Versioning on Candidate Claims`
+  - `[2026-11-12] | Mandatory Written Rationale for Non-VERIFIED Claim Acceptance`
+  - `[2026-11-12] | Strict Co-Ownership Restriction for KEEP_BOTH Conflict Resolution`
+  - `[2026-11-12] | Review Queue Ordering with Conflict Blocking`
+
+### 5. Security confirmation: Review & Conflict routes enforcement
+All review and conflict operations require valid project membership and specific roles:
+- `POST /api/projects/[id]/conflicts/[conflictId]/resolve`: `conflicts:resolve` (OWNER, REVIEWER).
+- `POST /api/projects/[id]/claims/[claimId]/review`: `claims:review` (OWNER, REVIEWER).
+- `GET /api/projects/[id]/review/queue`: `claims:view_unapproved` (OWNER, REVIEWER).
+- `GET /api/projects/[id]/conflicts`: `claims:view_unapproved` (OWNER, REVIEWER).
+- `GET /api/projects/[id]/conflicts/[conflictId]`: `claims:view_unapproved` (OWNER, REVIEWER).
+- VIEWER role receives HTTP 403 Forbidden for review and conflict resolution actions.
+- Non-members and missing projects receive HTTP 404 Not Found (no project enumeration).
+
 
 
 
