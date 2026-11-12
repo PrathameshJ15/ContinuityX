@@ -122,7 +122,7 @@ export async function uploadDocumentService(input: UploadDocumentInput) {
     });
 
     return createdDoc;
-  });
+  }, { maxWait: 30000, timeout: 60000 });
 
   await writeAudit({
     projectId: input.projectId,
@@ -334,7 +334,7 @@ export async function processDocumentNextStepService(
             lastError: null,
           },
         });
-      });
+      }, { maxWait: 30000, timeout: 60000 });
 
       await writeAudit({
         projectId,

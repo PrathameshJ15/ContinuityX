@@ -9,6 +9,8 @@ import {
   Users,
   LayoutDashboard,
   FileText,
+  ListChecks,
+  Network,
   Loader2,
   AlertOctagon,
 } from "lucide-react";
@@ -117,6 +119,18 @@ export default function ProjectWorkspaceLayout({
       href: `/projects/${projectId}/documents`,
       icon: FileText,
       active: pathname.startsWith(`/projects/${projectId}/documents`),
+    },
+    {
+      name: "Claims",
+      href: `/projects/${projectId}/claims`,
+      icon: ListChecks,
+      active: pathname.startsWith(`/projects/${projectId}/claims`),
+    },
+    {
+      name: "Entities",
+      href: `/projects/${projectId}/entities`,
+      icon: Network,
+      active: pathname.startsWith(`/projects/${projectId}/entities`),
     },
     {
       name: "Members & Settings",

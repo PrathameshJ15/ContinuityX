@@ -19,6 +19,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 
 interface DocumentItem {
@@ -37,6 +38,9 @@ interface DocumentItem {
     | "EXTRACTING"
     | "CHUNKING"
     | "READY_FOR_AI"
+    | "AI_PROCESSING"
+    | "AI_COMPLETED"
+    | "AI_PROCESSING_FAILED"
     | "VALIDATION_FAILED"
     | "EXTRACTION_FAILED";
   uploadedAt: string;
@@ -114,6 +118,7 @@ export default function DocumentsPage({
     chunks: DocumentChunk[];
   } | null>(null);
   const [loadingChunks, setLoadingChunks] = useState(false);
+  const [extractingDocId, setExtractingDocId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -230,6 +235,39 @@ export default function DocumentsPage({
     }
   }
 
+  async function handleExtract(docId: string) {
+    try {
+      setError(null);
+      setExtractingDocId(docId);
+      const res = await fetch(`/api/projects/${projectId}/documents/${docId}/extract`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "AI extraction failed");
+
+      const r = data.data as {
+        cached: boolean;
+        claimsCreated: number;
+        flaggedChunks: number;
+        model: string;
+      };
+      setSuccess(
+        r.cached
+          ? `Extraction cache hit (${r.model}): existing candidate claims are already up to date.`
+          : `Extracted ${r.claimsCreated} claim${r.claimsCreated === 1 ? "" : "s"} using ${r.model}.${
+              r.flaggedChunks > 0 ? ` (${r.flaggedChunks} chunk flagged for injection-like text)` : ""
+            }`
+      );
+      setTimeout(() => setSuccess(null), 6000);
+      await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "AI extraction failed");
+      await loadData();
+    } finally {
+      setExtractingDocId(null);
+    }
+  }
+
   async function handleDelete(docId: string, name: string) {
     if (!confirm(`Are you sure you want to remove '${name}'? This is a soft delete.`)) return;
 
@@ -273,23 +311,31 @@ export default function DocumentsPage({
   function renderStatusStepper(doc: DocumentItem) {
     const isFailed =
       doc.processingStatus === "VALIDATION_FAILED" ||
-      doc.processingStatus === "EXTRACTION_FAILED";
-    const activeIdx = getStepIndex(doc.processingStatus);
+      doc.processingStatus === "EXTRACTION_FAILED" ||
+      doc.processingStatus === "AI_PROCESSING_FAILED";
+    const activeIdx =
+      doc.processingStatus === "AI_COMPLETED" || doc.processingStatus === "AI_PROCESSING"
+        ? PIPELINE_STEPS.length - 1
+        : getStepIndex(doc.processingStatus);
 
     return (
       <div className="space-y-1.5">
         <div className="flex items-center gap-1.5">
-          {doc.processingStatus === "READY_FOR_AI" ? (
+          {doc.processingStatus === "AI_COMPLETED" ? (
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+              <CheckCircle2 className="h-3 w-3" /> AI EXTRACTED
+            </span>
+          ) : doc.processingStatus === "READY_FOR_AI" ? (
             <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
               <CheckCircle2 className="h-3 w-3" /> READY FOR AI
             </span>
           ) : isFailed ? (
             <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-destructive/10 text-destructive">
-              <AlertCircle className="h-3 w-3" /> {doc.processingStatus.replace("_", " ")}
+              <AlertCircle className="h-3 w-3" /> {doc.processingStatus.replace(/_/g, " ")}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-              <Loader2 className="h-3 w-3 animate-spin" /> {doc.processingStatus}
+              <Loader2 className="h-3 w-3 animate-spin" /> {doc.processingStatus.replace(/_/g, " ")}
             </span>
           )}
         </div>
@@ -588,6 +634,30 @@ export default function DocumentsPage({
                             >
                               <Download className="h-4 w-4" />
                             </a>
+
+                            {(doc.processingStatus === "READY_FOR_AI" ||
+                              doc.processingStatus === "AI_COMPLETED" ||
+                              doc.processingStatus === "AI_PROCESSING_FAILED") &&
+                              doc.chunkCount > 0 &&
+                              canUpload && (
+                                <button
+                                  onClick={() => handleExtract(doc.id)}
+                                  disabled={extractingDocId === doc.id}
+                                  title="Run AI claim extraction on document chunks"
+                                  className="inline-flex items-center gap-1 rounded px-2 py-1 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 text-xs font-medium transition-colors"
+                                >
+                                  {extractingDocId === doc.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                  )}
+                                  {doc.processingStatus === "AI_PROCESSING_FAILED"
+                                    ? "Retry AI"
+                                    : doc.processingStatus === "AI_COMPLETED"
+                                      ? "Re-run AI"
+                                      : "Run Extraction"}
+                                </button>
+                              )}
 
                             {(doc.processingStatus === "VALIDATION_FAILED" ||
                               doc.processingStatus === "EXTRACTION_FAILED") &&

@@ -37,6 +37,9 @@ enum DocumentProcessingStatus {
   EXTRACTING
   CHUNKING
   READY_FOR_AI
+  AI_PROCESSING
+  AI_COMPLETED
+  AI_PROCESSING_FAILED
   VALIDATION_FAILED
   EXTRACTION_FAILED
 }
@@ -46,6 +49,47 @@ enum ProcessingJobState {
   RUNNING
   COMPLETED
   FAILED
+}
+
+enum ExtractionRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  CACHED
+}
+
+enum EntityType {
+  PERSON
+  COMPONENT
+  SYSTEM
+}
+
+enum EntityCreator {
+  MODEL
+  REVIEWER
+}
+
+enum ClaimCategory {
+  DECISION
+  TASK
+  OWNERSHIP
+  DEPENDENCY
+  RISK
+  OPEN_QUESTION
+  FACT
+}
+
+enum ReviewState {
+  PENDING
+  ACCEPTED
+  EDITED
+  REJECTED
+}
+
+enum EvidenceType {
+  DIRECT_QUOTE
+  TABLE_ROW
+  SECTION_EXCERPT
 }
 
 model User {
@@ -72,9 +116,12 @@ model Project {
   createdByUser User            @relation("ProjectCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
-  members       ProjectMember[]
-  documents     Document[]
-  auditLogs     AuditLog[]
+  members        ProjectMember[]
+  documents      Document[]
+  extractionRuns ExtractionRun[]
+  entities       Entity[]
+  claims         Claim[]
+  auditLogs      AuditLog[]
 
   @@index([createdBy])
   @@index([status])
@@ -116,6 +163,8 @@ model Document {
   uploadedAt       DateTime                 @default(now())
   chunks           DocumentChunk[]
   processingJobs   ProcessingJob[]
+  extractionRuns   ExtractionRun[]
+  claimEvidence    ClaimEvidence[]
 
   @@index([projectId, checksum])
   @@index([projectId])
@@ -126,20 +175,23 @@ model Document {
 }
 
 model DocumentChunk {
-  id           String    @id @default(cuid())
-  documentId   String
-  document     Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  chunkIndex   Int
-  content      String    @db.Text
-  pageNumber   Int?
-  sectionTitle String?
-  rowStart     Int?
-  rowEnd       Int?
-  metadata     Json?
-  createdAt    DateTime  @default(now())
+  id            String          @id @default(cuid())
+  documentId    String
+  document      Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkIndex    Int
+  content       String          @db.Text
+  pageNumber    Int?
+  sectionTitle  String?
+  rowStart      Int?
+  rowEnd        Int?
+  injectionFlag Boolean         @default(false)
+  metadata      Json?
+  createdAt     DateTime        @default(now())
+  claimEvidence ClaimEvidence[]
 
   @@index([documentId, chunkIndex])
   @@index([pageNumber])
+  @@index([injectionFlag])
 }
 
 model ProcessingJob {
@@ -175,6 +227,109 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+}
+
+model ExtractionRun {
+  id            String              @id @default(cuid())
+  projectId     String
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentId    String
+  document      Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  model         String
+  promptVersion String
+  schemaVersion String
+  inputChecksum String
+  status        ExtractionRunStatus @default(RUNNING)
+  startedAt     DateTime            @default(now())
+  finishedAt    DateTime?
+  error         String?
+  claims        Claim[]
+
+  @@index([projectId, documentId])
+  @@index([inputChecksum, promptVersion, model, schemaVersion])
+  @@index([status])
+}
+
+model Entity {
+  id             String        @id @default(cuid())
+  projectId      String
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  canonicalName  String
+  normalizedId   String
+  type           EntityType
+  createdBy      EntityCreator @default(MODEL)
+  mergedIntoId   String?
+  mergedInto     Entity?       @relation("EntityMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedEntities Entity[]      @relation("EntityMerge")
+  needsReview    Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  aliases        EntityAlias[]
+  claims         Claim[]
+
+  @@unique([projectId, normalizedId])
+  @@index([projectId, type])
+  @@index([mergedIntoId])
+  @@index([needsReview])
+}
+
+model EntityAlias {
+  id              String   @id @default(cuid())
+  entityId        String
+  entity          Entity   @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  alias           String
+  normalizedAlias String
+  createdAt       DateTime @default(now())
+
+  @@unique([entityId, normalizedAlias])
+  @@index([normalizedAlias])
+}
+
+model Claim {
+  id                String          @id @default(cuid())
+  projectId         String
+  project           Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  subjectEntityId   String
+  subjectEntity     Entity          @relation(fields: [subjectEntityId], references: [id], onDelete: Restrict)
+  attributeKey      String
+  valueRaw          String          @db.Text
+  valueNormalized   String?
+  category          ClaimCategory
+  reviewState       ReviewState     @default(PENDING)
+  version           Int             @default(1)
+  supersedesClaimId String?
+  supersedesClaim   Claim?          @relation("ClaimVersion", fields: [supersedesClaimId], references: [id], onDelete: SetNull)
+  supersededBy      Claim[]         @relation("ClaimVersion")
+  extractionRunId   String?
+  extractionRun     ExtractionRun?  @relation(fields: [extractionRunId], references: [id], onDelete: SetNull)
+  injectionFlag     Boolean         @default(false)
+  confidence        Float?          // Advisory only; never used to derive evidence status
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  evidence          ClaimEvidence[]
+
+  @@index([projectId, subjectEntityId, attributeKey])
+  @@index([projectId, category, reviewState])
+  @@index([extractionRunId])
+  @@index([injectionFlag])
+  @@index([supersedesClaimId])
+}
+
+model ClaimEvidence {
+  id             String        @id @default(cuid())
+  claimId        String
+  claim          Claim         @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  documentId     String
+  document       Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkId        String
+  chunk          DocumentChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  sourceLocation String
+  excerpt        String        @db.Text
+  evidenceType   EvidenceType  @default(DIRECT_QUOTE)
+  createdAt      DateTime      @default(now())
+
+  @@index([claimId])
+  @@index([documentId, chunkId])
 }
 
 model HealthCheck {

@@ -1,0 +1,283 @@
+// @vitest-environment node
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { EntityCreator, EntityType, ProjectRole } from "@prisma/client";
+import {
+  normalizeEntityKey,
+  computeEntitySimilarity,
+  isAmbiguousPersonMention,
+  resolveSubjectEntity,
+} from "@/services/entities/resolution";
+import { mergeEntitiesService, updateEntityService } from "@/services/entities";
+
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    $transaction: vi.fn(),
+    projectMember: { findUnique: vi.fn() },
+    entity: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), findUniqueOrThrow: vi.fn() },
+    entityAlias: { deleteMany: vi.fn(), createMany: vi.fn(), create: vi.fn(), upsert: vi.fn() },
+    claim: { updateMany: vi.fn() },
+    auditLog: { create: vi.fn() },
+  },
+}));
+
+vi.mock("@/lib/auth", () => ({
+  getCurrentUser: vi.fn(),
+}));
+
+describe("Phase 3 Entity Resolution, Ambiguity Guard & Reviewer Merging", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("resolves Authentication Module, Auth module, and login service consistently", async () => {
+    expect(normalizeEntityKey("AuthService")).toBe("auth service");
+    expect(computeEntitySimilarity("Authentication Module", "Auth module")).toBeGreaterThanOrEqual(0.86);
+    expect(computeEntitySimilarity("Authentication Module", "login service")).toBeGreaterThanOrEqual(0.86);
+
+    const upsertedAliases: string[] = [];
+    const mockDb = {
+      entity: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "ent-auth",
+            canonicalName: "Authentication Module",
+            normalizedId: "authentication module",
+            type: EntityType.COMPONENT,
+            mergedIntoId: null,
+            needsReview: false,
+            aliases: [
+              { id: "al-1", alias: "Authentication Module", normalizedAlias: "authentication module" },
+            ],
+          },
+        ]),
+        findFirst: vi.fn(),
+        create: vi.fn(),
+      },
+      entityAlias: {
+        upsert: vi.fn().mockImplementation(async ({ create }) => {
+          upsertedAliases.push(create.alias);
+          return create;
+        }),
+      },
+    };
+
+    const r1 = await resolveSubjectEntity(mockDb as never, {
+      projectId: "proj-1",
+      proposedEntityId: "NEW",
+      proposedName: "Auth module",
+      proposedType: EntityType.COMPONENT,
+    });
+    expect(r1.entityId).toBe("ent-auth");
+    expect(r1.createdNew).toBe(false);
+    expect(r1.resolutionMethod).toBe("FUZZY_MATCH");
+
+    const r2 = await resolveSubjectEntity(mockDb as never, {
+      projectId: "proj-1",
+      proposedEntityId: "NEW",
+      proposedName: "login service",
+      proposedType: EntityType.COMPONENT,
+    });
+    expect(r2.entityId).toBe("ent-auth");
+    expect(r2.createdNew).toBe(false);
+    expect(upsertedAliases).toEqual(["Auth module", "login service"]);
+  });
+
+  it("flags same-first-name PERSON ambiguity (Arjun vs Arjun Mehta & Arjun Verma) without merging", async () => {
+    const registry = [
+      {
+        id: "ent-arjun-m",
+        canonicalName: "Arjun Mehta",
+        normalizedId: "arjun mehta",
+        type: EntityType.PERSON,
+        mergedIntoId: null,
+        needsReview: false,
+        aliases: [],
+      },
+      {
+        id: "ent-arjun-v",
+        canonicalName: "Arjun Verma",
+        normalizedId: "arjun verma",
+        type: EntityType.PERSON,
+        mergedIntoId: null,
+        needsReview: false,
+        aliases: [],
+      },
+    ];
+
+    expect(isAmbiguousPersonMention("Arjun", EntityType.PERSON, registry)).toBe(true);
+    expect(isAmbiguousPersonMention("Arjun Mehta", EntityType.PERSON, registry)).toBe(false);
+
+    const mockDb = {
+      entity: {
+        findMany: vi.fn().mockResolvedValue(registry),
+        findFirst: vi.fn(),
+        create: vi.fn().mockResolvedValue({
+          id: "ent-arjun-ambig",
+          canonicalName: "Arjun",
+          needsReview: true,
+        }),
+      },
+      entityAlias: { upsert: vi.fn() },
+    };
+
+    const res = await resolveSubjectEntity(mockDb as never, {
+      projectId: "proj-1",
+      proposedEntityId: "ent-arjun-m", // even if model guessed one, single-token same-first-name guard stops silent merge
+      proposedName: "Arjun",
+      proposedType: EntityType.PERSON,
+    });
+
+    expect(res.entityId).toBe("ent-arjun-ambig");
+    expect(res.createdNew).toBe(true);
+    expect(res.needsReview).toBe(true);
+    expect(res.resolutionMethod).toBe("AMBIGUOUS_PERSON");
+  });
+
+  it("ignores invalid or cross-project model-proposed entity IDs safely", async () => {
+    const mockDb = {
+      entity: {
+        findMany: vi.fn().mockResolvedValue([]),
+        // Returns null because proposed ID belongs to another project
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({
+          id: "ent-new-1",
+          canonicalName: "RFID Gateway",
+          needsReview: false,
+        }),
+      },
+      entityAlias: { upsert: vi.fn() },
+    };
+
+    const res = await resolveSubjectEntity(mockDb as never, {
+      projectId: "proj-1",
+      proposedEntityId: "cross_project_secret_id",
+      proposedName: "RFID Gateway",
+      proposedType: EntityType.COMPONENT,
+    });
+
+    expect(res.entityId).toBe("ent-new-1");
+    expect(res.createdNew).toBe(true);
+    expect(res.resolutionMethod).toBe("NEW_ENTITY");
+  });
+
+  it("supports reviewer soft merge and alias editing with audit log entries", async () => {
+    const { prisma } = await import("@/lib/db");
+    const { getCurrentUser } = await import("@/lib/auth");
+
+    vi.mocked(getCurrentUser).mockResolvedValue({
+      id: "rev-1",
+      email: "rev@example.com",
+      name: "Reviewer",
+    });
+    vi.mocked(prisma.projectMember.findUnique).mockResolvedValue({
+      id: "pm-1",
+      projectId: "proj-1",
+      userId: "rev-1",
+      role: ProjectRole.REVIEWER,
+      joinedAt: new Date(),
+      project: { id: "proj-1", status: "ACTIVE" },
+    } as never);
+
+    vi.mocked(prisma.entity.findFirst)
+      .mockResolvedValueOnce({
+        id: "ent-src",
+        projectId: "proj-1",
+        canonicalName: "AuthService",
+        normalizedId: "auth service",
+        type: EntityType.COMPONENT,
+        mergedIntoId: null,
+        aliases: [{ id: "a1", alias: "AuthService", normalizedAlias: "auth service" }],
+      } as never)
+      .mockResolvedValueOnce({
+        id: "ent-tgt",
+        projectId: "proj-1",
+        canonicalName: "Authentication Module",
+        normalizedId: "authentication module",
+        type: EntityType.COMPONENT,
+        createdBy: EntityCreator.MODEL,
+        mergedIntoId: null,
+        aliases: [{ id: "a2", alias: "Authentication Module", normalizedAlias: "authentication module" }],
+      } as never);
+
+    const movedClaimUpdates: unknown[] = [];
+    const createdTargetAliases: string[] = [];
+    const updatedEntities: Array<{ id: string; mergedIntoId?: string }> = [];
+
+    vi.mocked(prisma.$transaction).mockImplementation(async (arg: unknown) => {
+      if (typeof arg === "function") {
+        return arg({
+          claim: {
+            updateMany: async (payload: unknown) => {
+              movedClaimUpdates.push(payload);
+              return { count: 2 };
+            },
+          },
+          entityAlias: {
+            create: async ({ data }: { data: { alias: string } }) => {
+              createdTargetAliases.push(data.alias);
+              return data;
+            },
+          },
+          entity: {
+            update: async ({ where, data }: { where: { id: string }; data: { mergedIntoId?: string } }) => {
+              updatedEntities.push({ id: where.id, mergedIntoId: data.mergedIntoId });
+              return {};
+            },
+          },
+        });
+      }
+      return [];
+    });
+
+    const mergeRes = await mergeEntitiesService("proj-1", "ent-src", "ent-tgt");
+    expect(mergeRes).toEqual({
+      merged: true,
+      sourceEntityId: "ent-src",
+      targetEntityId: "ent-tgt",
+    });
+    expect(movedClaimUpdates).toHaveLength(1);
+    expect(createdTargetAliases).toContain("AuthService");
+    expect(updatedEntities.some((u) => u.id === "ent-src" && u.mergedIntoId === "ent-tgt")).toBe(true);
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+
+    // Verify alias edit clearing needsReview
+    vi.mocked(prisma.entity.findFirst).mockResolvedValueOnce({
+      id: "ent-tgt",
+      projectId: "proj-1",
+      canonicalName: "Authentication Module",
+      normalizedId: "authentication module",
+      mergedIntoId: null,
+      aliases: [],
+    } as never);
+    vi.mocked(prisma.$transaction).mockImplementationOnce(async (arg: unknown) => {
+      if (typeof arg === "function") {
+        return arg({
+          entity: {
+            update: async () => ({}),
+            findUniqueOrThrow: async () => ({
+              id: "ent-tgt",
+              canonicalName: "Authentication Module",
+              needsReview: false,
+              aliases: [
+                { id: "x1", alias: "Authentication Module", normalizedAlias: "authentication module" },
+                { id: "x2", alias: "SSO Core", normalizedAlias: "sso core" },
+              ],
+            }),
+          },
+          entityAlias: {
+            deleteMany: async () => ({ count: 0 }),
+            createMany: async () => ({ count: 2 }),
+          },
+        });
+      }
+      return null;
+    });
+
+    const edited = await updateEntityService("proj-1", "ent-tgt", {
+      aliases: ["SSO Core"],
+      needsReview: false,
+    });
+    expect(edited.needsReview).toBe(false);
+    expect(edited.aliases.map((a) => a.alias)).toContain("SSO Core");
+  });
+});
