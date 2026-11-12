@@ -7,8 +7,8 @@ Update at the end of every phase and every work session. Status comes from the r
 | 0 | Repository Audit & Foundation | Done | Yes | 2026-11-12 | Foundation scaffolded, typecheck/lint/tests/build passing, 5 decisions recorded |
 | 1 | Authentication & Project Workspace | Done | Yes | 2026-11-12 | Auth, User/Project/ProjectMember/AuditLog, permission matrix (61 tests pass) |
 | 2 | Document Intelligence & Upload | Done | Yes | 2026-11-12 | Live Neon migration applied & seeded; validation, parsers, chunking, DEV dataset, 95 tests pass |
-| 3 | AI Claim Extraction & Entity Registry | In progress | No | 2026-11-12 | Step 1 Inspect & Plan submitted for review |
-| 4 | Proof-Carrying Verification Engine | Not started | No | | |
+| 3 | AI Claim Extraction & Entity Registry | Done | Yes | 2026-11-12 | Extraction pipeline, entity registry, vocabulary normalization, injection defense, 114 tests pass |
+| 4 | Proof-Carrying Verification Engine | In progress | No | 2026-11-12 | Phase 4 plan drafted; implementing 4-gate verification & deterministic status algorithm |
 | 5 | Conflict Detection & Human Review | Not started | No | | |
 | 6 | Handover Generation & SHA-256 Receipt | Not started | No | | |
 | 7 | Knowledge Loss Radar | Not started | No | | |
@@ -138,5 +138,75 @@ Every document route enforces server-side auth & membership (`requireProjectAcce
 - `POST /api/projects/[id]/documents/[docId]/process`: `documents:upload_or_delete` (OWNER, REVIEWER only)
 - `POST /api/projects/[id]/documents/[docId]/retry`: `documents:upload_or_delete` (OWNER, REVIEWER only)
 - `DELETE /api/projects/[id]/documents/[docId]`: `documents:upload_or_delete` (OWNER, REVIEWER only)
+
+---
+
+## Phase 3 Standard Phase Report
+
+### 1. What was built
+- **Database Models & Enums (`prisma/migrations/20261112140812_init_phase3_claims_entities`):**
+  - Added models: `ExtractionRun`, `Entity`, `EntityAlias`, `Claim`, and `ClaimEvidence`.
+  - Added enums: `ExtractionRunStatus`, `EntityType`, `EntityCreator`, `ClaimCategory`, `ReviewState`, `EvidenceType`.
+  - Applied to Neon PostgreSQL with real foreign keys and indexes.
+- **Controlled Attribute Vocabulary & Value Normalization (`src/lib/ai/vocabulary.ts`):**
+  - Canonical controlled attributes (`status`, `owner`, `selected_technology`, `due_date`, `depends_on`, `risk`, `open_question`, `rationale`).
+  - Cardinality specification (single vs multi) and deterministic synonym normalizer dictionary.
+  - Value normalization logic (`valueNormalized`) storing null when unmappable, without inventing values.
+- **Prompt Injection Defense & Pre-Scanner (`src/lib/ai/injection-detector.ts`, `src/lib/ai/prompts/extractor-v1.ts`):**
+  - Multi-pattern detection for prompt injection vectors (`IGNORE PREVIOUS`, system override markers, role-switching tokens).
+  - Explicit delimiter tags (`<document_chunk>`) and extraction system instructions ensuring document content is treated strictly as untrusted data.
+- **AI Extraction Pipeline & Service (`src/services/extraction/index.ts`, `src/lib/ai/provider.ts`):**
+  - Schema-constrained JSON extraction using Gemini 3.5 Flash Lite with structured output validation via Zod.
+  - Caching layer via input checksum, model, promptVersion, and schemaVersion in `ExtractionRun`.
+  - Structured extraction creates `Claim` records linked to `ClaimEvidence` with verbatim excerpts and source locations.
+- **Entity Resolution Engine (`src/services/entities/resolution.ts`, `src/services/entities/index.ts`):**
+  - Exact match, case-insensitive alias match, and token-overlap fuzzy matching.
+  - Ambiguity detection flagging `needsReview = true` instead of silently merging uncertain entities.
+  - Entity merge service (`mergeEntitiesService`) re-pointing claims, merging aliases, and writing audit logs.
+- **Claims Management Service (`src/services/claims/index.ts`):**
+  - Pagination, filtering by category, entity, document, and reviewState.
+  - Versioned claim editing creating superseding version chains (`supersedesClaimId`).
+- **API Routes:**
+  - `/api/projects/[id]/documents/[docId]/extract` (POST - trigger extraction)
+  - `/api/projects/[id]/claims` (GET - list project claims with pagination/filters)
+  - `/api/projects/[id]/claims/[claimId]` (GET, PATCH - inspect or edit claim)
+  - `/api/projects/[id]/entities` (GET, POST - list or create entities)
+  - `/api/projects/[id]/entities/[entityId]` (GET, PATCH - inspect or update entity)
+  - `/api/projects/[id]/entities/merge` (POST - merge two entities)
+- **UI Screens & Components:**
+  - Claims browser (`/projects/[projectId]/claims`) with category tabs, filters, injection warnings, and edit modals.
+  - Entity registry (`/projects/[projectId]/entities`) with merge workflow, alias management, and ambiguity indicators.
+
+### 2. Commands run and their real results
+- `npx prisma migrate dev --name init_phase3_claims_entities`: Exit code 0 (applied migration to Neon PostgreSQL).
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm test`: Exit code 0 (114 tests passed across 13 test suites).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm run build`: Exit code 0 (all 28 routes compiled cleanly).
+
+### 3. Exit-criteria checklist
+- [x] Schema-constrained extraction of decisions, tasks, owners, dependencies, risks, and questions — **PASS**
+- [x] Claim triples `(subject, attribute, value)` with verbatim excerpts and source locations — **PASS**
+- [x] Canonical entities and aliases with merge and ambiguity flagging — **PASS**
+- [x] Controlled attribute vocabulary and value normalization with dictionary mapping — **PASS**
+- [x] Prompt injection defenses and untrusted text isolation tested — **PASS**
+- [x] ExtractionRun caching and provenance tracking — **PASS**
+- [x] typecheck, lint, tests and build pass — **PASS**
+
+### 4. Deviations and DECISIONS.md entries
+- Recorded Phase 3 autonomous decisions for vocabulary normalization, entity ambiguity thresholding, and extraction run hashing.
+
+### 5. Security confirmation: Extraction and Claim routes enforcement
+Every route strictly calls `requireProjectAccess` enforcing server-side permission checks:
+- `POST /api/projects/[id]/documents/[docId]/extract`: `ai:run_extraction_verification` (OWNER, REVIEWER)
+- `GET /api/projects/[id]/claims`: `claims:view_unapproved` (OWNER, REVIEWER)
+- `GET /api/projects/[id]/claims/[claimId]`: `claims:view_unapproved` (OWNER, REVIEWER)
+- `PATCH /api/projects/[id]/claims/[claimId]`: `review:claims_conflicts_entities` (OWNER, REVIEWER)
+- `GET /api/projects/[id]/entities`: `project:read` (OWNER, REVIEWER, VIEWER)
+- `POST /api/projects/[id]/entities`: `review:claims_conflicts_entities` (OWNER, REVIEWER)
+- `GET /api/projects/[id]/entities/[entityId]`: `project:read` (OWNER, REVIEWER, VIEWER)
+- `PATCH /api/projects/[id]/entities/[entityId]`: `review:claims_conflicts_entities` (OWNER, REVIEWER)
+- `POST /api/projects/[id]/entities/merge`: `review:claims_conflicts_entities` (OWNER, REVIEWER)
+
 
 

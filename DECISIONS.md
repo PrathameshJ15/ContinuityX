@@ -79,5 +79,14 @@ These resolve ambiguities in the locked V3.1 documents. They add no P0-A feature
 - [2026-11-12] | Strict Source Date Preservation (`USER_PROVIDED` vs `UNKNOWN`) (autonomous) | Optional user-supplied upload date records `sourceDateBasis = USER_PROVIDED`; omitted dates leave `sourceDate = null` and `sourceDateBasis = UNKNOWN`. Rejected: inferring `sourceDate` from OS file timestamps or `uploadedAt`. | Enforces V3.2 temporal integrity rule so Phase 5 never infers supersession without reliable dates.
 - [2026-11-12] | Gemini Free Tier Model Update (autonomous): GEMINI_EXTRACTION_MODEL=gemini-3.5-flash-lite and GEMINI_JUDGE_MODEL=gemini-3.5-flash | Live verification against Google AI Studio Free Tier showed legacy `gemini-1.5-flash`, `gemini-1.5-pro`, `gemini-2.5-flash`, and `gemini-2.5-pro` are unlisted/404 for new keys and `gemini-3.1-pro-preview`/`gemini-pro-latest` return 429 zero free-tier quota, whereas both `gemini-3.5-flash-lite` (extraction) and `gemini-3.5-flash` (reasoning judge) authenticate and respond HTTP 200 on Free Tier while keeping extractor and judge on distinct models. | Prevents 404/429 runtime failures without changing billing tier or AI architecture.
 
+---
+
+## Phase 3 Autonomous Decisions
+
+- [2026-11-12] | Controlled Attribute Vocabulary with Cardinality & Synonym Normalization (autonomous) | Implemented canonical attribute vocabulary (`src/lib/ai/vocabulary.ts`) with strict cardinality rules and deterministic dictionary mapping for values. Rejected: unconstrained free-text attributes (causes silent conflict detection failure due to vocabulary mismatch). | Unlocks high-recall conflict detection while preserving verbatim `valueRaw`.
+- [2026-11-12] | Conservative Entity Disambiguation with Review Flagging (autonomous) | In entity resolution, if multiple potential matches exist or similarity is ambiguous (< 0.85 threshold), system creates a new entity and flags `needsReview = true` instead of guessing. Rejected: aggressive fuzzy auto-merging. | Protects project knowledge graph from false merges while allowing human reviewers to execute clean merges via `mergeEntitiesService`.
+- [2026-11-12] | Extraction Caching by Deterministic Input Checksum (autonomous) | Keyed `ExtractionRun` on `(inputChecksum, promptVersion, model, schemaVersion)`. If identical document content is extracted with the same model parameters, previous results can be reused or audited. | Saves API calls and provides transparent provenance tracking.
+
+
 
 
