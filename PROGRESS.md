@@ -109,7 +109,7 @@ All project routes and server actions strictly enforce permissions on the server
 ### 2. Commands run and their real results
 - `npx prisma migrate dev --name init_phase1_phase2`: Exit code 0 (created and applied migration to Neon Postgres).
 - `npm run db:seed`: Exit code 0 (seeded demo accounts and synthetic project `cmwdiir940003t1c4i0b29dtg`).
-- `npx tsx scripts/run-baseline-dev.ts`: Exit code 0 (parsed 5 DEV files cleanly; skipped Gemini call with explicit message `[Baseline] Skipped: GEMINI_API_KEY is not configured.`).
+- `npx tsx scripts/run-baseline-dev.ts`: Exit code 0 (ran DEV baseline against Google AI Studio Free Tier `gemini-3.5-flash-lite`; saved `benchmark/results/dev-baseline.json` & `benchmark/results/dev-baseline.md`).
 - `npm run typecheck`: Exit code 0 (`tsc --noEmit` 0 errors).
 - `npm test`: Exit code 0 (95 passed across 9 test suites, including 12 validation tests, 13 parser/chunking/DEV fixture tests, and 9 document service & authorization tests).
 - `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
@@ -123,11 +123,11 @@ All project routes and server actions strictly enforce permissions on the server
 - [x] Processing status is visible and retry works — **PASS**
 - [x] Files are private; no public URLs — **PASS**
 - [x] DEV dataset and `ground_truth.json` exist — **PASS**
-- [~] Baseline result saved (or explicitly skipped with a reason) — **SKIPPED cleanly** (no `GEMINI_API_KEY` configured yet; ready to run via `npm run baseline:dev`)
+- [x] Baseline result saved (or explicitly skipped with a reason) — **PASS** (`benchmark/results/dev-baseline.json` & `dev-baseline.md` via `gemini-3.5-flash-lite`)
 - [x] typecheck, lint, tests and build pass — **PASS**
 
 ### 4. Deviations and DECISIONS.md entries
-- Added 4 Phase 2 entries in `DECISIONS.md` (`unpdf`/`mammoth`/`papaparse`, `ProcessingJob.stepData`, env-configurable upload caps, `USER_PROVIDED`/`UNKNOWN` date preservation).
+- Added 5 Phase 2 entries in `DECISIONS.md` (`unpdf`/`mammoth`/`papaparse`, `ProcessingJob.stepData`, env-configurable upload caps, `USER_PROVIDED`/`UNKNOWN` date preservation, and Free Tier model update to `gemini-3.5-flash-lite` / `gemini-3.5-flash`).
 
 ### 5. Security confirmation: Document routes enforcement
 Every document route enforces server-side auth & membership (`requireProjectAccess` with unified 404 for missing/non-member projects):

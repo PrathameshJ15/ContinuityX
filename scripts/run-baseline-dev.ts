@@ -60,6 +60,12 @@ async function collectDevDocumentsText() {
 }
 
 async function main() {
+  try {
+    process.loadEnvFile?.();
+  } catch {
+    // .env may not exist in CI or when env vars are passed directly
+  }
+
   const documentsText = await collectDevDocumentsText();
   const apiKey = process.env.GEMINI_API_KEY?.trim();
 
@@ -69,13 +75,14 @@ async function main() {
     return;
   }
 
-  const model = process.env.GEMINI_EXTRACTION_MODEL?.trim() || "gemini-2.5-flash";
+  const model = process.env.GEMINI_EXTRACTION_MODEL?.trim() || "gemini-3.5-flash-lite";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model,
   )}:generateContent`;
 
   const response = await fetch(endpoint, {
     method: "POST",
+    signal: AbortSignal.timeout(60000),
     headers: {
       "Content-Type": "application/json",
       "x-goog-api-key": apiKey,
