@@ -4,6 +4,8 @@ import { requireProjectAccess } from "@/lib/permissions";
 import { writeAudit } from "@/lib/audit";
 import { AppError } from "@/lib/api-response";
 import { normalizeEntityKey } from "./resolution";
+import { createEntitySchema, entityNameSchema, entityAliasSchema } from "./schema";
+import { ZodError } from "zod";
 
 export async function listEntitiesService(
   projectId: string,
@@ -76,13 +78,20 @@ export async function updateEntityService(
     );
   }
 
-  const nextName = input.canonicalName?.replace(/\s+/g, " ").trim();
-  if (nextName !== undefined) {
-    if (nextName.length < 2) {
-      throw new AppError("VALIDATION_ERROR", "Entity name must be at least 2 characters.", 400);
+  let nextName: string | undefined;
+  if (input.canonicalName !== undefined) {
+    const parseRes = entityNameSchema.safeParse(input.canonicalName);
+    if (!parseRes.success) {
+      throw new AppError("VALIDATION_ERROR", parseRes.error.issues[0]?.message || "Invalid entity name.", 400);
     }
-    if (!/[a-zA-Z]/.test(nextName)) {
-      throw new AppError("VALIDATION_ERROR", "Entity name must contain at least one letter.", 400);
+    nextName = parseRes.data;
+  }
+  if (Array.isArray(input.aliases)) {
+    for (const raw of input.aliases) {
+      const parseRes = entityAliasSchema.safeParse(raw);
+      if (!parseRes.success) {
+        throw new AppError("VALIDATION_ERROR", parseRes.error.issues[0]?.message || "Invalid entity alias.", 400);
+      }
     }
   }
   const nextNormalizedId = nextName ? normalizeEntityKey(nextName) : undefined;
@@ -285,13 +294,17 @@ export async function createManualEntityService(
     explicitUserId
   );
 
-  const cleanName = input.canonicalName.replace(/\s+/g, " ").trim();
-  if (cleanName.length < 2) {
-    throw new AppError("VALIDATION_ERROR", "Entity name must be at least 2 characters.", 400);
+  let validated;
+  try {
+    validated = createEntitySchema.parse(input);
+  } catch (err) {
+    if (err instanceof ZodError) {
+      throw new AppError("VALIDATION_ERROR", err.issues[0]?.message || "Invalid entity input.", 400);
+    }
+    throw err;
   }
-  if (!/[a-zA-Z]/.test(cleanName)) {
-    throw new AppError("VALIDATION_ERROR", "Entity name must contain at least one letter.", 400);
-  }
+
+  const cleanName = validated.canonicalName;
   const normalizedId = normalizeEntityKey(cleanName);
   if (!cleanName || !normalizedId) {
     throw new AppError("VALIDATION_ERROR", "Entity name cannot be empty.", 400);
@@ -308,16 +321,69 @@ export async function createManualEntityService(
     );
   }
 
-  const seen = new Set<string>([normalizedId]);
+  const existingAliasMatch = await prisma.entityAlias.findFirst({
+    where: {
+      entity: { projectId },
+      normalizedAlias: normalizedId,
+    },
+    include: { entity: true },
+  });
+  if (existingAliasMatch) {
+    throw new AppError(
+      "CONFLICT",
+      `Normalized name '${cleanName}' is already registered as an alias for entity '${existingAliasMatch.entity.canonicalName}' in this project.`,
+      409
+    );
+  }
+
+  const seenAliases = new Set<string>([normalizedId]);
   const aliasData: Array<{ alias: string; normalizedAlias: string }> = [
     { alias: cleanName, normalizedAlias: normalizedId },
   ];
-  for (const raw of input.aliases ?? []) {
+
+  for (const raw of validated.aliases ?? []) {
     const clean = raw.replace(/\s+/g, " ").trim();
     const norm = normalizeEntityKey(clean);
-    if (clean && norm && !seen.has(norm)) {
-      seen.add(norm);
-      aliasData.push({ alias: clean, normalizedAlias: norm });
+    if (seenAliases.has(norm)) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        `Duplicate normalized alias '${clean}' within the same entity.`,
+        400
+      );
+    }
+    seenAliases.add(norm);
+    aliasData.push({ alias: clean, normalizedAlias: norm });
+  }
+
+  const submittedNormAliases = aliasData.slice(1).map((a) => a.normalizedAlias);
+  if (submittedNormAliases.length > 0) {
+    const aliasInUse = await prisma.entityAlias.findFirst({
+      where: {
+        entity: { projectId },
+        normalizedAlias: { in: submittedNormAliases },
+      },
+      include: { entity: true },
+    });
+    if (aliasInUse) {
+      throw new AppError(
+        "CONFLICT",
+        `Alias '${aliasInUse.alias}' already belongs to entity '${aliasInUse.entity.canonicalName}' in this project.`,
+        409
+      );
+    }
+
+    const nameInUse = await prisma.entity.findFirst({
+      where: {
+        projectId,
+        normalizedId: { in: submittedNormAliases },
+      },
+    });
+    if (nameInUse) {
+      throw new AppError(
+        "CONFLICT",
+        `Alias collides with existing entity name '${nameInUse.canonicalName}' in this project.`,
+        409
+      );
     }
   }
 
@@ -326,7 +392,7 @@ export async function createManualEntityService(
       projectId,
       canonicalName: cleanName,
       normalizedId,
-      type: input.type,
+      type: validated.type,
       createdBy: EntityCreator.REVIEWER,
       needsReview: false,
       aliases: { create: aliasData },

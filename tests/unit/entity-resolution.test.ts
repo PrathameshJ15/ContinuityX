@@ -18,7 +18,7 @@ vi.mock("@/lib/db", () => ({
     user: { findUnique: vi.fn() },
     projectMember: { findUnique: vi.fn() },
     entity: { findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), findUniqueOrThrow: vi.fn(), create: vi.fn() },
-    entityAlias: { deleteMany: vi.fn(), createMany: vi.fn(), create: vi.fn(), upsert: vi.fn() },
+    entityAlias: { findFirst: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn(), create: vi.fn(), upsert: vi.fn() },
     claim: { updateMany: vi.fn() },
     auditLog: { create: vi.fn() },
   },
@@ -297,9 +297,9 @@ describe("Phase 3 Entity Resolution, Ambiguity Guard & Reviewer Merging", () => 
       }
     });
 
-    it("rejects names shorter than 2 characters via Zod schema", () => {
+    it("rejects names shorter than 2 characters via Zod schema ('a')", () => {
       const result = createEntitySchema.safeParse({
-        canonicalName: "A",
+        canonicalName: "a",
         type: EntityType.COMPONENT,
       });
       expect(result.success).toBe(false);
@@ -308,15 +308,52 @@ describe("Phase 3 Entity Resolution, Ambiguity Guard & Reviewer Merging", () => 
       }
     });
 
-    it("accepts valid trimmed names containing letters", () => {
+    it("rejects whitespace-only names via Zod schema", () => {
+      const result = createEntitySchema.safeParse({
+        canonicalName: "    ",
+        type: EntityType.COMPONENT,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects HTML tags / non-plain-text via Zod schema", () => {
+      const result = createEntitySchema.safeParse({
+        canonicalName: "<script>alert(1)</script>",
+        type: EntityType.COMPONENT,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain("plain text");
+      }
+    });
+
+    it("accepts valid trimmed names and valid aliases", () => {
       const result = createEntitySchema.safeParse({
         canonicalName: "  Auth Module V2  ",
         type: EntityType.COMPONENT,
+        aliases: ["Authentication", "Auth Service"],
       });
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.canonicalName).toBe("Auth Module V2");
+        expect(result.data.aliases).toEqual(["Authentication", "Auth Service"]);
       }
+    });
+
+    it("rejects invalid aliases via Zod schema ('12345678', 'x', '<tag>')", () => {
+      const numericAlias = createEntitySchema.safeParse({
+        canonicalName: "Auth Engine",
+        type: EntityType.COMPONENT,
+        aliases: ["12345678"],
+      });
+      expect(numericAlias.success).toBe(false);
+
+      const shortAlias = createEntitySchema.safeParse({
+        canonicalName: "Auth Engine",
+        type: EntityType.COMPONENT,
+        aliases: ["x"],
+      });
+      expect(shortAlias.success).toBe(false);
     });
 
     it("throws VALIDATION_ERROR in createManualEntityService for pure numeric names", async () => {
@@ -370,6 +407,78 @@ describe("Phase 3 Entity Resolution, Ambiguity Guard & Reviewer Merging", () => 
           "u-1"
         )
       ).rejects.toThrow("already exists in this project");
+    });
+
+    it("throws VALIDATION_ERROR in createManualEntityService when duplicate alias is provided", async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: "u-1",
+        name: "Alice",
+        email: "alice@example.com",
+      } as never);
+      vi.mocked(prisma.projectMember.findUnique).mockResolvedValue({
+        id: "pm-1",
+        projectId: "proj-1",
+        userId: "u-1",
+        role: ProjectRole.REVIEWER,
+        project: { id: "proj-1", status: "ACTIVE" },
+      } as never);
+      vi.mocked(prisma.entity.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.entityAlias.findFirst).mockResolvedValue(null);
+
+      await expect(
+        createManualEntityService(
+          "proj-1",
+          {
+            canonicalName: "Database Layer",
+            type: EntityType.COMPONENT,
+            aliases: ["DB Core", "db-core"], // duplicates after normalization
+          },
+          "u-1"
+        )
+      ).rejects.toThrow("Duplicate normalized alias");
+    });
+
+    it("allows the same entity name in another project", async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: "u-1",
+        name: "Alice",
+        email: "alice@example.com",
+      } as never);
+      vi.mocked(prisma.projectMember.findUnique).mockResolvedValue({
+        id: "pm-2",
+        projectId: "proj-2",
+        userId: "u-1",
+        role: ProjectRole.REVIEWER,
+        project: { id: "proj-2", status: "ACTIVE" },
+      } as never);
+
+      // In proj-2, there is no collision
+      vi.mocked(prisma.entity.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.entityAlias.findFirst).mockResolvedValue(null);
+      vi.mocked(prisma.entity.create).mockResolvedValue({
+        id: "ent-proj2-auth",
+        projectId: "proj-2",
+        canonicalName: "Auth Engine",
+        normalizedId: "auth engine",
+        type: EntityType.COMPONENT,
+        createdBy: EntityCreator.REVIEWER,
+        needsReview: false,
+        aliases: [{ id: "al-1", alias: "Auth Engine", normalizedAlias: "auth engine" }],
+      } as never);
+
+      const created = await createManualEntityService(
+        "proj-2",
+        { canonicalName: "Auth Engine", type: EntityType.COMPONENT },
+        "u-1"
+      );
+
+      expect(created.id).toBe("ent-proj2-auth");
+      expect(created.projectId).toBe("proj-2");
+      expect(prisma.entity.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { projectId: "proj-2", normalizedId: "auth engine" },
+        })
+      );
     });
   });
 });

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, use, useCallback } from "react";
 import { z } from "zod";
+import { entityNameSchema, entityAliasSchema, createEntitySchema } from "@/services/entities/schema";
+import { normalizeEntityKey } from "@/services/entities/resolution";
 import {
   AlertCircle,
   AlertTriangle,
@@ -100,12 +102,6 @@ export default function EntitiesPage({
     e.preventDefault();
     if (!editing) return;
 
-    const entityNameSchema = z
-      .string()
-      .trim()
-      .min(2, "Entity name must be at least 2 characters.")
-      .regex(/[a-zA-Z]/, "Entity name must contain at least one letter.");
-
     const parsed = entityNameSchema.safeParse(editName);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message || "Invalid entity name");
@@ -113,12 +109,7 @@ export default function EntitiesPage({
     }
 
     const trimmedEdit = parsed.data;
-    const normalizedEdit = trimmedEdit
-      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const normalizedEdit = normalizeEntityKey(trimmedEdit);
 
     const collision = entities.find(
       (ent) => ent.normalizedId === normalizedEdit && ent.id !== editing.id
@@ -126,6 +117,19 @@ export default function EntitiesPage({
     if (collision) {
       setError(`An entity with normalized name '${normalizedEdit}' already exists in this project ('${collision.canonicalName}').`);
       return;
+    }
+
+    const aliases = editAliasesText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    for (const a of aliases) {
+      const aliasParsed = entityAliasSchema.safeParse(a);
+      if (!aliasParsed.success) {
+        setError(aliasParsed.error.issues[0]?.message || "Invalid entity alias");
+        return;
+      }
     }
 
     try {
@@ -192,25 +196,24 @@ export default function EntitiesPage({
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
 
-    const entityNameSchema = z
-      .string()
-      .trim()
-      .min(2, "Entity name must be at least 2 characters.")
-      .regex(/[a-zA-Z]/, "Entity name must contain at least one letter.");
+    const rawAliases = newAliasesText
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    const parsed = entityNameSchema.safeParse(newName);
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message || "Invalid entity name");
+    const parseResult = createEntitySchema.safeParse({
+      canonicalName: newName,
+      type: newType,
+      aliases: rawAliases.length > 0 ? rawAliases : undefined,
+    });
+
+    if (!parseResult.success) {
+      setError(parseResult.error.issues[0]?.message || "Invalid entity input");
       return;
     }
 
-    const trimmedNew = parsed.data;
-    const normalizedNew = trimmedNew
-      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const trimmedNew = parseResult.data.canonicalName;
+    const normalizedNew = normalizeEntityKey(trimmedNew);
 
     const collision = entities.find((ent) => ent.normalizedId === normalizedNew);
     if (collision) {
@@ -221,10 +224,7 @@ export default function EntitiesPage({
     try {
       setSaving(true);
       setError(null);
-      const aliases = newAliasesText
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const aliases = parseResult.data.aliases || [];
 
       const res = await fetch(`/api/projects/${projectId}/entities`, {
         method: "POST",

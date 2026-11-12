@@ -29,7 +29,12 @@ export async function POST(
     const parsed = createEntitySchema.safeParse(body);
 
     if (!parsed.success) {
-      return jsonError("VALIDATION_ERROR", "Invalid entity payload.", 400, parsed.error.issues);
+      return jsonError(
+        "VALIDATION_ERROR",
+        parsed.error.issues[0]?.message || "Invalid entity payload.",
+        400,
+        parsed.error.issues
+      );
     }
 
     const entity = await createManualEntityService(projectId, parsed.data);
