@@ -39,7 +39,7 @@
 | **Hardened Handover Q&A with Citation Enforcement** | **Done** | Stage 1: Relational retrieval over approved claims only; returns authoritative refusal without model call if 0 claims match. Stage 2: Structured model output (`citedClaimIds`); verifies every citation server-side against retrieved set. 8 tests in `tests/integration/qa-service.test.ts`. |
 | **Multi-Tenant RBAC & Zero Project ID Enumeration** | **Done** | 12-permission server-side matrix across `OWNER`, `REVIEWER`, `VIEWER`. Unauthenticated requests or non-members always receive unified HTTP 404 (`ProjectNotFoundError`), preventing project existence probing. `src/lib/permissions.ts`. |
 | **Audit Logging with Deep Secret Redaction** | **Done** | Structured audit logging (`AuditLog` table) tracking uploads, reviews, entity merges, conflict resolutions, and approvals. Deep recursive sanitizer redacts passwords, tokens, API keys, and connection strings. `src/lib/audit.ts`. |
-| **Automated DEV & Held-Out TEST Benchmark Suite** | **Done** | Automated evaluation harness comparing ContinuityX against a single-pass Gemini baseline across 40 claims, 10 conflicts, 6 traps, and 2 injections with frozen JSON fixtures. `scripts/run_benchmark.ts`, `tests/integration/benchmark.test.ts`. |
+| **DEV & TEST Benchmark Suite** | **Done** | Benchmark evaluation script comparing ContinuityX against a single-pass Gemini baseline across 40 claims, 10 conflicts, 6 traps, and 2 injections with JSON fixtures (`scripts/run_benchmark.ts`, `tests/integration/benchmark.test.ts`). |
 
 ---
 
@@ -143,13 +143,13 @@ To eliminate model hallucinations, ContinuityX enforces that no claim reaches `V
 | **Project Memory Canvas Graph View (P1)** | **Modified** | Implemented as interactive Entity Registry and tabular Bus Factor Dependency Map. Canvas node-link visualizer deferred to P2. | Entity registry with aliases, review flags, and merge workflows delivers higher utility for conflict resolution than an uncalibrated canvas visualizer (`SPEC.md` line 96). |
 | **Role-Specific Handover Templates (P1)** | **Modified** | Unified canonical 14-section handover report exported to PDF. Multi-template picker postponed. | A single, comprehensive canonical handover containing all decisions, tasks, owners, and receipts ensures complete fidelity before introducing partial role-based exports. |
 | **"Incoming Member" Role Name** | **Modified** | Mapped to `VIEWER` role in 3-role matrix (`OWNER`, `REVIEWER`, `VIEWER`). | Standardizes SaaS RBAC terminology while providing incoming members read-only access to approved handovers, receipts, and Q&A (`DECISIONS.md` [2026-11-12]). |
-| **Single Evaluation Project (8-10 Docs)** | **Modified** | Split into TWO synthetic projects: DEV ("Smart Attendance", 4 docs) and held-out TEST ("Campus Drone", 4 docs), totaling 40 claims. | Mandatory held-out testing prevents prompt overfitting and verifies that extraction and conflict rules generalize (`SPEC.md` V3.2). |
+| **Single Evaluation Project (8-10 Docs)** | **Modified** | Split into TWO synthetic projects: DEV ("Smart Attendance", 4 docs) and TEST ("Campus Drone", 4 docs), totaling 40 claims. | Testing across separate datasets intended to verify generalization, though TEST labels and results were committed together in `23d55c9` and were not independently reviewed. |
 
 ---
 
 ## 5. Evaluation
 
-The platform was evaluated against **N=40 manually labeled claims**, **N=10 planted conflicts**, **N=6 hallucination traps**, and **N=2 adversarial prompt injections** across DEV and held-out TEST datasets. Ground-truth fixtures were authored and frozen in `demo-data/dev/ground_truth.json` and `demo-data/test/ground_truth.json`.
+The platform was evaluated against **N=40 labeled claims**, **N=10 planted conflicts**, **N=6 hallucination traps**, and **N=2 adversarial prompt injections** across DEV ("Smart Attendance System", N=15) and TEST ("Campus Delivery Drone Navigation System", N=25) datasets. Ground-truth labels and evaluation results were committed together in commit `23d55c907c94bdd29b0a0d3fb27a6dfcd6ea7ea8`, so label freezing before the evaluation run cannot be demonstrated from git history. The ground-truth labels were authored by the development team using an AI coding assistant (`autonomous` per `DECISIONS.md`); labels were not independently reviewed. Benchmark comparison metrics were computed by `scripts/run_benchmark.ts` against static fixtures rather than executed against a live user interface. In addition, claims in the seeded demo project were approved programmatically in bulk using `scripts/approve_project_claims.ts` rather than individually reviewed and approved through the reviewer cockpit UI.
 
 ### 5.1 Baseline Configuration
 - **Baseline Prompt:** *"Analyse supplied project documents; produce a structured project summary; identify decisions, tasks, owners and risks; cite supporting source documents and locations; explicitly list contradictions and inconsistencies."*
@@ -176,7 +176,7 @@ The platform was evaluated against **N=40 manually labeled claims**, **N=10 plan
 ### 5.3 Observed Failures and Methodological Limitations
 1. **ContinuityX Attribution Failures (2/40 claims in TEST):** On multi-page PDF documents, irregular column layouts caused character span offsets to be off by several lines, failing the 0.85 quote match threshold and downgrading valid claims to `UNVERIFIED`.
 2. **Small Evaluation Sample Size:** Total benchmark comprises 40 claims, 10 conflicts, 6 traps, and 2 prompt injections. While rigorous, results on larger enterprise corpuses may vary.
-3. **Synthetic Author-Designed Datasets:** Ground truth and test documents were created by the platform authors, which could inherently reflect the assumptions of the schema.
+3. **Synthetic Author-Designed Datasets & Label Freezing Limitations:** Ground truth and test documents were authored by the development team using an AI coding assistant and were not independently reviewed. Because TEST labels and results were committed together in `23d55c9`, label freezing before the run cannot be proven from repository history. Furthermore, demo claims were approved programmatically by script (`scripts/approve_project_claims.ts`) rather than through live manual reviewer cockpit interactions.
 4. **Same-Vendor Model Evaluation:** Gemini models were utilized for both extraction and judging, introducing potential common reasoning blind spots.
 
 ---
