@@ -113,15 +113,39 @@ export async function computeRadarAlertsService(
       include: {
         subjectEntity: true,
         claimA: {
-          include: {
-            verifications: { orderBy: { verifiedAt: "desc" }, take: 1 },
-            evidence: { include: { document: true } },
+          select: {
+            id: true,
+            attributeKey: true,
+            valueRaw: true,
+            valueNormalized: true,
+            reviewState: true,
+            verifications: { orderBy: { verifiedAt: "desc" }, take: 1, select: { status: true } },
+            evidence: {
+              select: {
+                documentId: true,
+                sourceLocation: true,
+                excerpt: true,
+                document: { select: { fileName: true } },
+              },
+            },
           },
         },
         claimB: {
-          include: {
-            verifications: { orderBy: { verifiedAt: "desc" }, take: 1 },
-            evidence: { include: { document: true } },
+          select: {
+            id: true,
+            attributeKey: true,
+            valueRaw: true,
+            valueNormalized: true,
+            reviewState: true,
+            verifications: { orderBy: { verifiedAt: "desc" }, take: 1, select: { status: true } },
+            evidence: {
+              select: {
+                documentId: true,
+                sourceLocation: true,
+                excerpt: true,
+                document: { select: { fileName: true } },
+              },
+            },
           },
         },
       },

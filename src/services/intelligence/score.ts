@@ -63,8 +63,14 @@ export async function computeContinuityIntelligenceService(
       where: { projectId, reviewState: { not: "REJECTED" } },
       include: {
         subjectEntity: true,
-        verifications: { orderBy: { verifiedAt: "desc" }, take: 1 },
-        evidence: true,
+        verifications: {
+          orderBy: { verifiedAt: "desc" },
+          take: 1,
+          select: { status: true },
+        },
+        evidence: {
+          select: { id: true },
+        },
       },
     }),
     // Active conflicts
