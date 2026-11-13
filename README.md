@@ -117,6 +117,12 @@ Full comparative evaluation report: [benchmark-report.md](benchmark/results/benc
 
 ---
 
+## User Research & Validation Status
+
+Qualitative user research is currently limited to 1 response from a short, consented three-question written interview with a senior software engineer (12 November 2026). This is a very small sample that provides early qualitative input consistent with our problem hypothesis; it does not validate the product or show how widespread the problem is. No other findings or quantitative claims are made.
+
+---
+
 ## Technical Stack
 
 - **Frontend & Fullstack:** Next.js 15.1.4 (App Router), React 19, TypeScript 5.7 (Strict Mode), Tailwind CSS 3.4.
@@ -137,6 +143,7 @@ Full comparative evaluation report: [benchmark-report.md](benchmark/results/benc
 5. **Unvalidated Heuristic Weights:** The 5 Continuity Score dimensions and R1–R6 Knowledge Radar rules represent initial rule-based heuristics rather than statistically calibrated organizational metrics.
 6. **File Format Constraints:** Ingestion is limited to `.pdf`, `.docx`, and `.csv`. Markdown (`.md`), plain text (`.txt`), spreadsheets (`.xlsx`), and code files are not currently accepted.
 7. **Free-Tier API Terms & Quotas:** On Google AI Studio Free Tier, inputs and outputs may be reviewed by human reviewers under Google terms of service. Only synthetic or de-identified data should be processed on unpaid tiers.
+8. **User Research Sample:** User research is limited to 1 interview response (small sample) and does not validate the product.
 
 ---
 
