@@ -172,13 +172,23 @@ export async function getReviewQueueService(
 ) {
   await requireProjectAccess(projectId, "claims:view_unapproved", userId);
 
-  // Fetch all latest version claims and open conflict count in parallel
-  const [claims, openConflictsCount] = await Promise.all([
-    prisma.claim.findMany({
+  // Fetch metrics counts and pending queue claims in parallel
+  const [claimCounts, pendingClaims, openConflictsCount] = await Promise.all([
+    prisma.claim.groupBy({
+      by: ["reviewState"],
       where: {
         projectId,
         supersededBy: { none: {} },
       },
+      _count: { _all: true },
+    }),
+    prisma.claim.findMany({
+      where: {
+        projectId,
+        reviewState: "PENDING",
+        supersededBy: { none: {} },
+      },
+      take: 100,
       include: {
         subjectEntity: {
           include: { aliases: true },
@@ -188,7 +198,9 @@ export async function getReviewQueueService(
             document: {
               select: { id: true, fileName: true, sourceDate: true, sourceDateBasis: true },
             },
-            chunk: true,
+            chunk: {
+              select: { id: true, content: true, pageNumber: true, sectionTitle: true },
+            },
           },
         },
         verifications: {
@@ -197,9 +209,11 @@ export async function getReviewQueueService(
         },
         conflictsAsA: {
           where: { status: "OPEN" },
+          select: { id: true },
         },
         conflictsAsB: {
           where: { status: "OPEN" },
+          select: { id: true },
         },
       },
     }),
@@ -208,10 +222,17 @@ export async function getReviewQueueService(
     }),
   ]);
 
-  const totalClaims = claims.length;
-  const pendingClaims = claims.filter((c) => c.reviewState === "PENDING");
-  const acceptedClaims = claims.filter((c) => c.reviewState === "ACCEPTED");
-  const rejectedClaims = claims.filter((c) => c.reviewState === "REJECTED");
+  let totalClaims = 0;
+  let pendingCount = 0;
+  let acceptedCount = 0;
+  let rejectedCount = 0;
+
+  for (const group of claimCounts) {
+    totalClaims += group._count._all;
+    if (group.reviewState === "PENDING") pendingCount = group._count._all;
+    else if (group.reviewState === "ACCEPTED") acceptedCount = group._count._all;
+    else if (group.reviewState === "REJECTED") rejectedCount = group._count._all;
+  }
 
   // Prioritize queue order:
   // 1. Claims in OPEN conflicts first
@@ -219,7 +240,7 @@ export async function getReviewQueueService(
   // 3. WEAK_SUPPORT
   // 4. UNKNOWN
   // 5. VERIFIED
-  const priorityRank = (claim: (typeof claims)[0]): number => {
+  const priorityRank = (claim: (typeof pendingClaims)[0]): number => {
     const hasOpenConflict = claim.conflictsAsA.length > 0 || claim.conflictsAsB.length > 0;
     if (hasOpenConflict) return 1;
 
@@ -266,9 +287,9 @@ export async function getReviewQueueService(
   return {
     metrics: {
       totalClaims,
-      pendingCount: pendingClaims.length,
-      acceptedCount: acceptedClaims.length,
-      rejectedCount: rejectedClaims.length,
+      pendingCount,
+      acceptedCount,
+      rejectedCount,
       openConflictsCount,
     },
     queue: queueItems,
