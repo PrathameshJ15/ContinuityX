@@ -34,6 +34,8 @@ interface ProjectItem {
   role: "OWNER" | "REVIEWER" | "VIEWER";
   createdAt: string;
   memberCount: number;
+  pendingReviews?: number;
+  recentHandover?: { version: number; approvedAt: string } | null;
 }
 
 interface UserProfile {
@@ -98,50 +100,16 @@ export default function DashboardPage() {
       setUser(userData.data.user);
       setProjects(loadedProjects);
 
-      // Concurrently fetch pending review counts and handovers for projects
+      // Efficiently populate review counts and handovers from single API response (O(1) vs N+1 requests)
       const workMap: Record<string, ProjectSummaryWork> = {};
-      await Promise.allSettled(
-        loadedProjects.map(async (p) => {
-          try {
-            const [queueRes, handoverRes] = await Promise.all([
-              fetch(`/api/projects/${p.id}/review/queue`),
-              fetch(`/api/projects/${p.id}/handovers`),
-            ]);
-
-            let pending = 0;
-            let recentH: ProjectSummaryWork["recentHandover"] = null;
-
-            if (queueRes.ok) {
-              const qData = await queueRes.json();
-              pending = qData.data?.metrics?.pendingCount ?? qData.data?.queue?.length ?? 0;
-            }
-
-            if (handoverRes.ok) {
-              const hData = await handoverRes.json();
-              const approvedList = (hData.data?.handovers || []).filter((h: { approvedAt?: string | null }) => Boolean(h.approvedAt));
-              if (approvedList.length > 0) {
-                recentH = {
-                  version: approvedList[0].version,
-                  approvedAt: approvedList[0].approvedAt,
-                };
-              }
-            }
-
-            workMap[p.id] = {
-              projectId: p.id,
-              projectName: p.name,
-              pendingReviews: pending,
-              recentHandover: recentH,
-            };
-          } catch {
-            workMap[p.id] = {
-              projectId: p.id,
-              projectName: p.name,
-              pendingReviews: 0,
-            };
-          }
-        })
-      );
+      for (const p of loadedProjects) {
+        workMap[p.id] = {
+          projectId: p.id,
+          projectName: p.name,
+          pendingReviews: p.pendingReviews ?? 0,
+          recentHandover: p.recentHandover ?? null,
+        };
+      }
       setProjectWork(workMap);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard data");

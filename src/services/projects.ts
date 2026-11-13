@@ -98,7 +98,16 @@ export async function listMyProjectsService(page: number = 1, limit: number = 10
         project: {
           include: {
             _count: {
-              select: { members: true },
+              select: {
+                members: true,
+                claims: { where: { reviewState: "PENDING" } },
+              },
+            },
+            handovers: {
+              where: { approvedAt: { not: null } },
+              orderBy: { approvedAt: "desc" },
+              take: 1,
+              select: { version: true, approvedAt: true },
             },
           },
         },
@@ -118,6 +127,13 @@ export async function listMyProjectsService(page: number = 1, limit: number = 10
     createdAt: m.project.createdAt,
     updatedAt: m.project.updatedAt,
     memberCount: m.project._count.members,
+    pendingReviews: m.project._count.claims ?? 0,
+    recentHandover: m.project.handovers?.[0]?.approvedAt
+      ? {
+          version: m.project.handovers[0].version,
+          approvedAt: m.project.handovers[0].approvedAt.toISOString(),
+        }
+      : null,
   }));
 
   return {
