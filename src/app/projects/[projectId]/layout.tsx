@@ -1,19 +1,12 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProjectOption } from "@/components/layout/sidebar";
 import { Loader2, AlertOctagon, ArrowLeft } from "lucide-react";
-
-interface ProjectDetails {
-  id: string;
-  name: string;
-  description: string | null;
-  status: "ACTIVE" | "ARCHIVED";
-  currentUserRole: "OWNER" | "REVIEWER" | "VIEWER";
-}
+import { WorkspaceProjectProvider, WorkspaceProject } from "./project-context";
 
 interface UserProfile {
   name: string;
@@ -32,12 +25,24 @@ export default function ProjectWorkspaceLayout({
   const resolvedParams = use(params);
   const projectId = resolvedParams.projectId;
 
-  const [project, setProject] = useState<ProjectDetails | null>(null);
+  const [project, setProject] = useState<WorkspaceProject | null>(null);
   const [allProjects, setAllProjects] = useState<ProjectOption[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const refreshProject = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}`);
+      if (res.ok) {
+        const json = await res.json();
+        setProject(json.data);
+      }
+    } catch {
+      // non-blocking
+    }
+  }, [projectId]);
 
   useEffect(() => {
     let isMounted = true;
@@ -153,13 +158,15 @@ export default function ProjectWorkspaceLayout({
   }
 
   return (
-    <AppShell
-      currentProject={project}
-      projects={allProjects}
-      user={user}
-      currentPageTitle={getCurrentPageTitle(pathname)}
-    >
-      {children}
-    </AppShell>
+    <WorkspaceProjectProvider value={{ project, setProject, refreshProject, loading }}>
+      <AppShell
+        currentProject={project}
+        projects={allProjects}
+        user={user}
+        currentPageTitle={getCurrentPageTitle(pathname)}
+      >
+        {children}
+      </AppShell>
+    </WorkspaceProjectProvider>
   );
 }

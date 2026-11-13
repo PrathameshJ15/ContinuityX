@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use, useCallback } from "react";
+import { useState, use } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/date";
 import { formatRoleLabel } from "@/lib/roles";
@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Badge } from "@/components/ui/badge";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import { useWorkspaceProject } from "../project-context";
 import {
   UserPlus,
   Shield,
@@ -23,25 +24,6 @@ import {
   X,
 } from "lucide-react";
 
-interface MemberItem {
-  id: string;
-  userId: string;
-  role: "OWNER" | "REVIEWER" | "VIEWER";
-  joinedAt: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
-}
-
-interface ProjectData {
-  id: string;
-  name: string;
-  currentUserRole: "OWNER" | "REVIEWER" | "VIEWER";
-  members: MemberItem[];
-}
-
 export default function MembersPage({
   params,
 }: {
@@ -49,9 +31,8 @@ export default function MembersPage({
 }) {
   const resolvedParams = use(params);
   const projectId = resolvedParams.projectId;
+  const { project, refreshProject, loading } = useWorkspaceProject();
 
-  const [project, setProject] = useState<ProjectData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -62,27 +43,6 @@ export default function MembersPage({
 
   // Row update action state
   const [actionId, setActionId] = useState<string | null>(null);
-
-  const loadMembers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}`);
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error?.message || "Failed to load project members");
-      }
-      setProject(data.data);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error loading members");
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    loadMembers();
-  }, [loadMembers]);
 
   async function handleAddMember(e: React.FormEvent) {
     e.preventDefault();
@@ -104,7 +64,7 @@ export default function MembersPage({
       setRole("VIEWER");
       setSuccess("Member added successfully.");
       setTimeout(() => setSuccess(null), 3000);
-      await loadMembers();
+      await refreshProject();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add member");
     } finally {
@@ -129,7 +89,7 @@ export default function MembersPage({
 
       setSuccess("Member role updated.");
       setTimeout(() => setSuccess(null), 3000);
-      await loadMembers();
+      await refreshProject();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to change role");
     } finally {
@@ -154,7 +114,7 @@ export default function MembersPage({
 
       setSuccess("Member removed.");
       setTimeout(() => setSuccess(null), 3000);
-      await loadMembers();
+      await refreshProject();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to remove member");
     } finally {

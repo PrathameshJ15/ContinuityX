@@ -10,6 +10,7 @@ import { Modal } from "@/components/ui/modal";
 import { FilterPills } from "@/components/ui/filter-pills";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import { useWorkspaceProject } from "../project-context";
 import {
   Upload,
   FileText,
@@ -68,12 +69,6 @@ interface DocumentChunk {
   rowEnd: number | null;
 }
 
-interface ProjectData {
-  id: string;
-  name: string;
-  currentUserRole: "OWNER" | "REVIEWER" | "VIEWER";
-}
-
 interface PaginationInfo {
   page: number;
   limit: number;
@@ -106,8 +101,8 @@ export default function DocumentsPage({
 }) {
   const resolvedParams = use(params);
   const projectId = resolvedParams.projectId;
+  const { project } = useWorkspaceProject();
 
-  const [project, setProject] = useState<ProjectData | null>(null);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -141,20 +136,13 @@ export default function DocumentsPage({
 
   const loadData = useCallback(async () => {
     try {
-      const [projRes, docsRes] = await Promise.all([
-        fetch(`/api/projects/${projectId}`),
-        fetch(`/api/projects/${projectId}/documents?page=${page}&limit=10`),
-      ]);
-
-      const projData = await projRes.json();
+      const docsRes = await fetch(`/api/projects/${projectId}/documents?page=${page}&limit=10`);
       const docsData = await docsRes.json();
 
-      if (!projRes.ok) throw new Error(projData.error?.message || "Failed to load project");
       if (!docsRes.ok) throw new Error(docsData.error?.message || "Failed to load documents");
 
-      setProject(projData.data);
-      setDocuments(docsData.data.documents || []);
-      if (docsData.data.pagination) {
+      setDocuments(docsData.data?.documents || []);
+      if (docsData.data?.pagination) {
         setPagination(docsData.data.pagination);
       }
     } catch (err: unknown) {

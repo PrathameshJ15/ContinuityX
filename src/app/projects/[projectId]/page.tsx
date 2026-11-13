@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/date";
 import { formatRoleLabel, getRoleBadgeClass } from "@/lib/roles";
 import { MetricCard } from "@/components/ui/metric-card";
 import { Badge } from "@/components/ui/badge";
+import { useWorkspaceProject } from "./project-context";
 import {
   FileText,
   AlertTriangle,
@@ -24,27 +25,6 @@ import {
   Activity,
   Layers,
 } from "lucide-react";
-
-interface ProjectData {
-  id: string;
-  name: string;
-  description: string | null;
-  status: "ACTIVE" | "ARCHIVED";
-  currentUserRole: "OWNER" | "REVIEWER" | "VIEWER";
-  createdAt: string;
-  createdByUser: {
-    name: string;
-    email: string;
-  };
-  members: Array<{
-    id: string;
-    role: "OWNER" | "REVIEWER" | "VIEWER";
-    user: {
-      name: string;
-      email: string;
-    };
-  }>;
-}
 
 interface IntelligenceData {
   score?: {
@@ -119,7 +99,7 @@ export default function ProjectOverviewPage({
   const resolvedParams = use(params);
   const projectId = resolvedParams.projectId;
 
-  const [project, setProject] = useState<ProjectData | null>(null);
+  const { project, refreshProject } = useWorkspaceProject();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -129,6 +109,13 @@ export default function ProjectOverviewPage({
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (project) {
+      setEditName(project.name);
+      setEditDesc(project.description || "");
+    }
+  }, [project]);
 
   // Health and Metric Aggregations
   const [intelligence, setIntelligence] = useState<IntelligenceData | null>(null);
@@ -142,29 +129,18 @@ export default function ProjectOverviewPage({
     setError(null);
     try {
       const [
-        projRes,
         intelRes,
         radarRes,
         conflictsRes,
         reviewRes,
         docsRes,
       ] = await Promise.allSettled([
-        fetch(`/api/projects/${projectId}`),
         fetch(`/api/projects/${projectId}/intelligence`),
         fetch(`/api/projects/${projectId}/radar`),
         fetch(`/api/projects/${projectId}/conflicts`),
         fetch(`/api/projects/${projectId}/review/queue`),
         fetch(`/api/projects/${projectId}/documents`),
       ]);
-
-      if (projRes.status === "fulfilled" && projRes.value.ok) {
-        const pJson = await projRes.value.json();
-        setProject(pJson.data);
-        setEditName(pJson.data.name);
-        setEditDesc(pJson.data.description || "");
-      } else {
-        throw new Error("Failed to load project details");
-      }
 
       if (intelRes.status === "fulfilled" && intelRes.value.ok) {
         const intelJson = await intelRes.value.json();
@@ -218,7 +194,7 @@ export default function ProjectOverviewPage({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || "Failed to update project");
 
-      setProject((prev) => (prev ? { ...prev, name: data.data.name, description: data.data.description } : null));
+      await refreshProject();
       setIsEditing(false);
       setSuccessMessage("Project details updated successfully.");
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -237,7 +213,7 @@ export default function ProjectOverviewPage({
       const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || "Failed to archive project");
-      setProject((prev) => (prev ? { ...prev, status: "ARCHIVED" } : null));
+      await refreshProject();
       setSuccessMessage("Project has been archived.");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: unknown) {
@@ -422,11 +398,11 @@ export default function ProjectOverviewPage({
           <div className="flex items-center gap-4 flex-wrap">
             <span className="flex items-center gap-1.5">
               <Users className="h-3.5 w-3.5 text-primary" />
-              <span>{project.members.length} Authorized Team Member{project.members.length !== 1 ? "s" : ""}</span>
+              <span>{(project.members?.length ?? 0)} Authorized Team Member{(project.members?.length ?? 0) !== 1 ? "s" : ""}</span>
             </span>
             <span className="flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5" />
-              <span>Created {formatDate(project.createdAt)} by {project.createdByUser.name}</span>
+              <span>Created {project.createdAt ? formatDate(project.createdAt) : "Recently"} by {project.createdByUser?.name ?? "Workspace Member"}</span>
             </span>
           </div>
 
