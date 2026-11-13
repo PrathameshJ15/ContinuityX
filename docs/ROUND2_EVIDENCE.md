@@ -172,19 +172,25 @@
 ### 1.3 Commit History Metrics
 **Status: PASS**
 
-- **Total Commit Count:** 43 commits (including the initial Round 2 documentation commit `425171f`).
-- **First Commit:**
+- **Total Commit Count:** 43 commits on branch `docs/round2-submission` (42 prior to current session).
+- **First Commit in Repository:**
   - Date: `2026-11-12 02:08:35 +0530`
-  - Hash: `926fb3b`
-  - Message: `feat(phase-0): initialize project foundation with Next.js 15, Prisma, and hermetic tests`
-- **Last Commit (Prior to documentation update):**
+  - Hash: `24970e3d12cba4a812ad553ebd5ca6cea95660b7`
+  - Message: `Add foundational documents for ContinuityX project`
+- **Last Commit (Prior to documentation audit branch):**
   - Date: `2026-11-13 23:42:53 +0530`
-  - Hash: `4e9d554`
-  - Message: `fix: add fallback retry ui and stabilize project routing`
-- **Commits per Day:**
-  - **2026-11-12:** 10 commits
-  - **2026-11-13:** 32 commits
-  - **2026-11-14:** 1 commit (documentation branch start)
+  - Hash: `f95f4c9379ff73429f022edd132c49115b1089ee`
+  - Message: `fix(qa): add null-safety guards for category and attributeKey in claim scoring`
+
+#### Commit Timeline by Date:
+
+| Date (UTC+05:30) | Commits | First Commit Time | Last Commit Time | Scope / Summary |
+|---|---|---|---|---|
+| **2026-11-12** | 10 | 02:08:35 +0530 | 23:36:49 +0530 | Scaffolding (Phase 0), Auth/Workspace (Phase 1), Ingestion/DEV dataset (Phase 2), Extraction/Entity Resolution (Phase 3), Verification Engine (Phase 4/5) |
+| **2026-11-13** | 29 | 00:09:49 +0530 | 23:42:53 +0530 | Handover receipt (Phase 6), Radar (Phase 7), Score/QA (Phase 8), Benchmark/Test dataset (Phase 9), Enterprise UI redesign, latency and routing optimizations |
+| **2026-11-14** | 4 | 00:33:41 +0530 | 00:47:05 +0530 | Dedicated documentation branch (`docs/round2-submission`) audits and honesty corrections |
+
+**Organiser build window start: UNKNOWN: team to fill**
 
 ---
 
@@ -337,14 +343,17 @@ enum EvidenceStatus {
 - **DEV and TEST Separation:**
   - The dataset comprises two separate synthetic projects:
     - **DEV Dataset:** "Smart Attendance System" (15 expected claims, 5 conflicts, 3 traps, 1 prompt injection).
-    - **Held-Out TEST Dataset:** "Campus Delivery Drone Navigation System" (25 expected claims, 5 conflicts, 3 traps, 1 prompt injection).
+    - **TEST Dataset:** "Campus Delivery Drone Navigation System" (25 expected claims, 5 conflicts, 3 traps, 1 prompt injection).
   - Metrics are recorded in separate baseline files: `benchmark/results/dev-baseline.md` and `benchmark/results/test-baseline.md`.
 - **Baseline Prompt & Model:**
   - Recorded in `benchmark/results/dev-baseline.md` (Model: `gemini-3.5-flash-lite`) and `benchmark/results/test-baseline.md` (Model: `gemini-2.0-flash`).
   - Baseline prompt: *"Analyse supplied project documents; produce a structured project summary; identify decisions, tasks, owners and risks; cite supporting source documents and locations; explicitly list contradictions and inconsistencies."*
-- **Commit History of TEST Labels vs Final Benchmark Run:**
-  - Git audit reveals that `demo-data/test/ground_truth.json` and `benchmark/results/benchmark-report.md` were committed together in commit `23d55c9` on `2026-11-13 00:54:08 +0530`.
-  - While test ground-truth labels were authored prior to the automated benchmark script execution in Phase 9, they were not committed in a separate isolated commit prior to the benchmark commit.
+- **Label Authorship and Commit Timing Audit:**
+  - Git audit shows that `demo-data/test/ground_truth.json` and `benchmark/results/benchmark-report.md` were committed together in commit `23d55c907c94bdd29b0a0d3fb27a6dfcd6ea7ea8` on `2026-11-13 00:54:08 +0530`.
+  - Because labels and results were committed together in commit `23d55c9`, label freezing before the run cannot be demonstrated from git history.
+  - The ground-truth labels were authored by the development team using an AI coding assistant (`autonomous` per `DECISIONS.md`); labels not independently reviewed.
+  - The benchmark evaluation script `scripts/run_benchmark.ts` computes comparisons against fixed metric constants rather than executing a live server test harness.
+  - In addition, claims in the seeded demo project were approved programmatically in bulk using `scripts/approve_project_claims.ts` rather than individually reviewed and approved through the reviewer cockpit UI.
 
 ---
 
@@ -365,7 +374,9 @@ enum EvidenceStatus {
        - Email: `member@continuityx.demo`
        - Password hash: bcrypt 10 rounds for `DemoPassword123!`
        - Role: `REVIEWER`
-  - Note: A dedicated `VIEWER` account is not pre-seeded in `prisma/seed.ts` (owners invite viewers via the Members interface).
+  - **Identified Gaps & Disclosures:**
+    - A dedicated `VIEWER` account is **not** seeded in `prisma/seed.ts` (added to Problem List below as Problem 11).
+    - Claims in the demo project were approved programmatically in bulk via `scripts/approve_project_claims.ts` rather than individually accepted through the reviewer cockpit UI.
 
 ---
 
@@ -385,7 +396,7 @@ enum EvidenceStatus {
 | **Radar & Score:** Knowledge Loss Radar R1-R6; Continuity Score with unavailable metrics excluded and >=60% threshold | **BUILT AS PLANNED** | `src/services/radar/rules.ts` (R1-R6), `src/services/radar/index.ts` (audited dismissals), `src/services/intelligence/score.ts` (5 dimensions, 60% threshold). | `DECISIONS.md` [2026-11-13] Phase 7 & Phase 8: Pure explainable rules with honest coverage handling; displays `INSUFFICIENT_EVIDENCE` when data is lacking. |
 | **Graph & Templates:** Basic project memory graph view (P1); role-specific handover templates (P1) | **BUILT DIFFERENTLY / PARTIAL** | Interactive Entity Registry (`src/app/projects/[projectId]/entities/page.tsx`) and Bus Factor Map (`src/app/projects/[projectId]/intelligence/page.tsx`) built. Canvas node-link graph deferred to P2. Handover uses unified 14-section format without per-role templates. | `SPEC.md` line 96: Node-link canvas visualization and multi-template generation deferred to post-MVP roadmap. |
 | **Roles:** Owner, Reviewer, Incoming Member | **BUILT DIFFERENTLY** | `prisma/schema.prisma` (`ProjectRole`: `OWNER`, `REVIEWER`, `VIEWER`). "Incoming Member" mapped to `VIEWER`. | `DECISIONS.md` [2026-11-12] Phase 1: `VIEWER` represents incoming team members with read-only access to approved handovers, receipts, and Q&A. |
-| **Evaluation Dataset:** Synthetic evaluation project of 8 to 10 documents | **BUILT DIFFERENTLY** | Evaluated across TWO synthetic projects totaling 8 valid documents + 1 malformed document (DEV: 4 docs, TEST: 4 docs, 40 total claims). | `DECISIONS.md` [2026-11-13] Phase 9: Splitting into DEV and held-out TEST sets prevents prompt overfitting and verifies generalization. |
+| **Evaluation Dataset:** Synthetic evaluation project of 8 to 10 documents | **BUILT DIFFERENTLY** | Evaluated across TWO synthetic projects totaling 8 valid documents + 1 malformed document (DEV: 4 docs, TEST: 4 docs, 40 total claims). | `DECISIONS.md` [2026-11-13] Phase 9: Splitting into DEV and TEST sets intended to test generalization, though TEST labels and results were committed together in `23d55c9` and were not independently reviewed. |
 
 ### Capabilities in Code NOT in Round 1 Plan:
 1. **Claim Triples `(subject, attribute, value)`:** Formal knowledge representation enabling structured semantic comparison.
@@ -399,7 +410,7 @@ enum EvidenceStatus {
 9. **Two-Stage Hardened Handover Q&A:** Relational retrieval with zero-call refusal if no approved claims match, and server-side citation validation (`src/services/intelligence/qa.ts`).
 10. **Optimistic Concurrency Locking (`expectedVersion`):** Prevents concurrent reviewer overwrites during review sessions (`src/services/reviews/index.ts`).
 11. **Audited Radar Alert Dismissals:** Mandatory written justifications stored permanently in `RadarDismissal` and `AuditLog`.
-12. **Held-Out DEV/TEST Automated Benchmark Runner:** Automated harness evaluating 40 ground-truth claims with frozen JSON fixtures (`scripts/run_benchmark.ts`).
+12. **DEV/TEST Benchmark Runner:** Benchmark evaluation script checking 40 ground-truth claims against JSON fixtures (`scripts/run_benchmark.ts`).
 
 ---
 
@@ -444,3 +455,7 @@ enum EvidenceStatus {
 ### 10. Serverless Polling Model for Long Ingestion Jobs
 - **Risk (Severity: Low):** Document chunking and extraction rely on client-side polling of `ProcessingJob` sub-steps. If a user closes the browser during multi-page extraction, the pipeline halts until reopened.
 - **Concrete Fix:** Implement durable asynchronous serverless execution (e.g. Inngest or QStash) to drive `processDocumentNextStepService` to completion independently of the browser tab.
+
+### 11. Missing Pre-Seeded VIEWER Demo Account in Seed Script
+- **Risk (Severity: Low):** `prisma/seed.ts` seeds only `lead@continuityx.demo` (`OWNER`) and `member@continuityx.demo` (`REVIEWER`). It does not pre-seed an account with the `VIEWER` role. While workspace owners can invite new viewers via the Members management interface, evaluators testing read-only role restrictions cannot immediately log into a dedicated pre-configured viewer account.
+- **Concrete Fix:** Add a third user (e.g. `viewer@continuityx.demo`, name: "Kavita Rao", password: `DemoPassword123!`) with `role: ProjectRole.VIEWER` directly to `prisma/seed.ts` and document its credentials alongside the other demo accounts in the README.
