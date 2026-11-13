@@ -40,14 +40,14 @@ export interface QAResponse {
 function extractAttributeKeywords(questionLower: string): string[] {
   const matchedAttributes = new Set<string>();
 
-  if (/(why|how|reason|rationale|decid|choice|chose|select)/i.test(questionLower)) {
+  if (/(why|how|reason|rationale|decid|decis|choice|chose|select|tech|architect)/i.test(questionLower)) {
     matchedAttributes.add("rationale");
     matchedAttributes.add("selected_technology");
   }
-  if (/(who|owner|lead|assign|responsible|team|contact)/i.test(questionLower)) {
+  if (/(who|owner|lead|assign|responsible|team|contact|person)/i.test(questionLower)) {
     matchedAttributes.add("owner");
   }
-  if (/(status|progress|state|pending|done|finish|completed|wip|active|task)/i.test(questionLower)) {
+  if (/(status|progress|state|pending|done|finish|completed|complete|wip|active|task|todo)/i.test(questionLower)) {
     matchedAttributes.add("status");
   }
   if (/(risk|block|issue|impediment|hazard|delay)/i.test(questionLower)) {
@@ -61,6 +61,25 @@ function extractAttributeKeywords(questionLower: string): string[] {
   }
 
   return Array.from(matchedAttributes);
+}
+
+/**
+ * Deterministic category intent matcher for natural language questions
+ */
+function extractCategoryKeywords(questionLower: string): string[] {
+  const matchedCategories = new Set<string>();
+
+  if (/(task|action|todo|progress|work item|wip|deliverable|completed|finish|pending)/i.test(questionLower)) {
+    matchedCategories.add("TASK");
+  }
+  if (/(decision|rationale|architect|technology|choice|selected|chose|decid|decis)/i.test(questionLower)) {
+    matchedCategories.add("DECISION");
+  }
+  if (/(owner|ownership|lead|assign|responsible|team|contact|person)/i.test(questionLower)) {
+    matchedCategories.add("OWNERSHIP");
+  }
+
+  return Array.from(matchedCategories);
 }
 
 /**
@@ -115,8 +134,9 @@ export async function askHandoverQuestionService(
     };
   }
 
-  // 2. Deterministic retrieval matching: Entity, Aliases, Attribute, Keywords
+  // 2. Deterministic retrieval matching: Entity, Aliases, Attribute, Category, Keywords
   const matchedAttributes = extractAttributeKeywords(questionLower);
+  const matchedCategories = extractCategoryKeywords(questionLower);
   const questionTokens = questionLower
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
@@ -129,6 +149,8 @@ export async function askHandoverQuestionService(
       const entityAliases = claim.subjectEntity.aliases.map((a) => a.alias.toLowerCase());
       const valueRawLower = claim.valueRaw.toLowerCase();
       const valueNormLower = (claim.valueNormalized || "").toLowerCase();
+      const categoryLower = claim.category.toLowerCase();
+      const attributeKeyLower = claim.attributeKey.toLowerCase();
 
       // Entity match
       if (questionLower.includes(entityName)) {
@@ -145,11 +167,18 @@ export async function askHandoverQuestionService(
         score += 5;
       }
 
-      // Token overlap in value
+      // Category intent match
+      if (matchedCategories.includes(claim.category)) {
+        score += 5;
+      }
+
+      // Token overlap in value, subject, category, or attribute
       for (const token of questionTokens) {
         if (entityName.includes(token)) score += 3;
         if (valueRawLower.includes(token)) score += 4;
         if (valueNormLower && valueNormLower.includes(token)) score += 4;
+        if (categoryLower.includes(token)) score += 2;
+        if (attributeKeyLower.includes(token)) score += 2;
       }
 
       return { claim, score };
