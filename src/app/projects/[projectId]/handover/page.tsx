@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
+import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { PageHeader } from "@/components/ui/page-header";
+import { MetricCard } from "@/components/ui/metric-card";
+import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle,
   AlertTriangle,
@@ -18,6 +25,8 @@ import {
   ShieldAlert,
   ShieldCheck,
   X,
+  Layers,
+  FileText,
 } from "lucide-react";
 
 interface HandoverSectionItem {
@@ -280,149 +289,129 @@ export default function HandoverPage({
   const renderStatusBadge = (status: string) => {
     switch (status) {
       case "VERIFIED":
-        return (
-          <span className="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold">
-            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-            VERIFIED
-          </span>
-        );
+        return <Badge variant="verified">VERIFIED</Badge>;
       case "WEAK_SUPPORT":
-        return (
-          <span className="inline-flex items-center gap-1 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-xs font-semibold">
-            <AlertTriangle className="h-3 w-3 text-amber-600" />
-            WEAK_SUPPORT
-          </span>
-        );
+        return <Badge variant="weak">WEAK SUPPORT</Badge>;
       case "CONFLICTING":
-        return (
-          <span className="inline-flex items-center gap-1 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 px-2 py-0.5 text-xs font-semibold">
-            <AlertCircle className="h-3 w-3 text-rose-600" />
-            CONFLICTING
-          </span>
-        );
+        return <Badge variant="contradicted">CONFLICTING</Badge>;
       default:
-        return (
-          <span className="inline-flex items-center gap-1 rounded bg-muted text-muted-foreground px-2 py-0.5 text-xs font-semibold">
-            {status}
-          </span>
-        );
+        return <Badge variant="neutral">{status}</Badge>;
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Header & Version Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Proof-Carrying Handover
-            </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-              <Award className="h-3.5 w-3.5" />
-              P0-A Checkpoint
-            </span>
+    <div className="space-y-8">
+      {/* Header */}
+      <PageHeader
+        breadcrumbs={
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Link href="/dashboard" className="hover:text-foreground">Projects</Link>
+            <span>/</span>
+            <Link href={`/projects/${projectId}`} className="hover:text-foreground">Project</Link>
+            <span>/</span>
+            <span className="text-foreground font-medium">Handover Workspace</span>
           </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Cryptographically sealed, versioned project documentation backed by SHA-256 receipts.
-          </p>
-        </div>
+        }
+        title="Proof-Carrying Handover"
+        badge={
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+            <Award className="h-3.5 w-3.5" />
+            P0-A Checkpoint
+          </span>
+        }
+        description="Cryptographically sealed, versioned project documentation backed by verifiable SHA-256 receipts."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Version Selector */}
+            <div className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-2.5 py-1.5 shadow-xs">
+              <History className="h-3.5 w-3.5 text-muted-foreground" />
+              <select
+                value={selectedVersion}
+                onChange={(e) =>
+                  setSelectedVersion(
+                    e.target.value === "DRAFT" ? "DRAFT" : parseInt(e.target.value, 10)
+                  )
+                }
+                className="bg-transparent text-xs font-medium text-foreground focus:outline-none cursor-pointer"
+              >
+                <option value="DRAFT">Draft Preview (Latest Accepted)</option>
+                {handoversList.map((h) => (
+                  <option key={h.id} value={h.version}>
+                    Version {h.version} ({formatDate(h.approvedAt || h.generatedAt)})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Version Selector */}
-          <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-muted-foreground" />
-            <select
-              value={selectedVersion}
-              onChange={(e) =>
-                setSelectedVersion(
-                  e.target.value === "DRAFT" ? "DRAFT" : parseInt(e.target.value, 10)
-                )
-              }
-              className="rounded-lg border bg-background px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
-            >
-              <option value="DRAFT">Draft Preview (Latest Accepted)</option>
-              {handoversList.map((h) => (
-                <option key={h.id} value={h.version}>
-                  Version {h.version} ({formatDate(h.approvedAt || h.generatedAt)})
-                </option>
-              ))}
-            </select>
+            {/* Action: Export PDF */}
+            {selectedVersion !== "DRAFT" && approvedData?.handover && (
+              <a
+                href={`/api/projects/${projectId}/handovers/${approvedData.handover.id}/export`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-accent shadow-xs transition-colors"
+              >
+                <Download className="h-3.5 w-3.5 text-primary" />
+                Export PDF
+              </a>
+            )}
+
+            {/* Action: Verify Receipt */}
+            {selectedVersion !== "DRAFT" && approvedData?.receipt && (
+              <button
+                onClick={handleVerifyReceipt}
+                disabled={verifying}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Verify Receipt
+              </button>
+            )}
+
+            {/* Action: Approve Handover Button */}
+            {selectedVersion === "DRAFT" && (
+              <button
+                onClick={() => setApprovalModalOpen(true)}
+                disabled={!draftData?.canApprove || loading}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Approve Handover
+              </button>
+            )}
           </div>
+        }
+      />
 
-          {/* Action: Export PDF */}
-          {selectedVersion !== "DRAFT" && approvedData?.handover && (
-            <a
-              href={`/api/projects/${projectId}/handovers/${approvedData.handover.id}/export`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted shadow-sm transition-colors"
-            >
-              <Download className="h-3.5 w-3.5 text-primary" />
-              Export PDF
-            </a>
-          )}
-
-          {/* Action: Verify Receipt */}
-          {selectedVersion !== "DRAFT" && approvedData?.receipt && (
-            <button
-              onClick={handleVerifyReceipt}
-              disabled={verifying}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 shadow-sm transition-colors disabled:opacity-50"
-            >
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Verify Receipt
-            </button>
-          )}
-
-          {/* Action: Approve Handover Button */}
-          {selectedVersion === "DRAFT" && (
-            <button
-              onClick={() => setApprovalModalOpen(true)}
-              disabled={!draftData?.canApprove || loading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors disabled:opacity-50"
-            >
-              <Lock className="h-3.5 w-3.5" />
-              Approve Handover
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Alerts */}
+      {/* Notifications */}
       {error && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive flex items-center justify-between">
+        <div role="alert" className="flex items-center justify-between gap-2 rounded-lg border border-rose-500/20 bg-rose-50/50 p-4 text-xs font-medium text-rose-800 dark:bg-rose-950/20 dark:text-rose-300">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
-          <button onClick={() => setError(null)}>
-            <X className="h-4 w-4" />
-          </button>
+          <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
       {success && (
-        <div className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 p-4 text-sm text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/20 bg-emerald-50/50 p-4 text-xs font-medium text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
             <span>{success}</span>
           </div>
-          <button onClick={() => setSuccess(null)}>
-            <X className="h-4 w-4" />
-          </button>
+          <button onClick={() => setSuccess(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
       {/* Blocking Alert in Draft Mode */}
       {selectedVersion === "DRAFT" && draftData && !draftData.canApprove && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-4 text-amber-900 dark:text-amber-200 text-xs space-y-1.5">
-          <div className="flex items-center gap-2 font-semibold text-sm">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <div className="rounded-xl border border-amber-300 bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/20 p-4 text-amber-900 dark:text-amber-200 text-xs space-y-2">
+          <div className="flex items-center gap-2 font-semibold text-sm text-amber-900 dark:text-amber-100">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
             Handover Approval Blocked by System Invariants
           </div>
-          <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-1">
+          <ul className="list-disc list-inside space-y-1 text-amber-800 dark:text-amber-300 ml-1">
             {draftData.blockingReasons.map((reason, i) => (
               <li key={i}>{reason}</li>
             ))}
@@ -430,57 +419,88 @@ export default function HandoverPage({
         </div>
       )}
 
+      {/* Metrics Strip */}
+      {currentDisplayHandover && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard
+            title="Total Approved Facts"
+            value={currentDisplayHandover.totalClaimsCount}
+            subtitle="Sealed in current snapshot"
+            icon={Layers}
+          />
+          <MetricCard
+            title="Strictly Verified"
+            value={currentDisplayHandover.verifiedClaimsCount}
+            subtitle="Passes 4-gate verification"
+            variant="success"
+            icon={ShieldCheck}
+          />
+          <MetricCard
+            title="Reviewer Accepted"
+            value={currentDisplayHandover.reviewerAcceptedCount}
+            subtitle="Human reviewed decisions"
+            icon={FileCheck}
+          />
+          <MetricCard
+            title="Source Documents"
+            value={currentDisplayHandover.totalDocumentsCount}
+            subtitle="Authoritative basis files"
+            icon={FileText}
+          />
+        </div>
+      )}
+
       {/* Cryptographic Receipt Card (when approved handover selected) */}
       {selectedVersion !== "DRAFT" && approvedData?.receipt && (
-        <div className="rounded-xl border border-primary/30 bg-card p-5 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+        <div className="rounded-xl border border-primary/30 bg-card p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/80 pb-3">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-emerald-600" />
               <h2 className="font-semibold text-base text-foreground">
                 Cryptographic Approval Receipt
               </h2>
-              <span className="rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 text-xs px-2 py-0.5 font-mono font-semibold">
+              <span className="rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 text-xs px-2 py-0.5 font-mono font-semibold">
                 v{approvedData.receipt.version}
               </span>
             </div>
             <div className="text-xs text-muted-foreground">
               Approved by{" "}
-              <span className="font-semibold text-foreground">
+              <strong className="text-foreground">
                 {approvedData.receipt.approvedBy.name}
-              </span>{" "}
+              </strong>{" "}
               on {formatDateTime(approvedData.receipt.approvedAt)}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             {/* Snapshot SHA-256 Hash */}
-            <div className="space-y-1 rounded-lg bg-muted/40 p-3 border">
+            <div className="space-y-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3.5 border border-border">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-foreground flex items-center gap-1.5">
                   <Lock className="h-3.5 w-3.5 text-primary" />
                   Canonical Snapshot SHA-256 Hash
                 </span>
                 <button
-                  onClick={() => handleCopyHash(approvedData.receipt.snapshotHash)}
-                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px]"
+                  onClick={() => handleCopyHash(approvedData.receipt!.snapshotHash)}
+                  className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[11px] font-medium cursor-pointer"
                   title="Copy Hash"
                 >
                   <Copy className="h-3 w-3" />
                   {copiedHash ? "Copied!" : "Copy"}
                 </button>
               </div>
-              <p className="font-mono text-xs break-all text-primary font-medium">
+              <p className="font-mono text-xs break-all text-primary font-medium select-all">
                 {approvedData.receipt.snapshotHash}
               </p>
             </div>
 
             {/* Previous Hash Chain */}
-            <div className="space-y-1 rounded-lg bg-muted/40 p-3 border">
+            <div className="space-y-1.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3.5 border border-border">
               <span className="font-semibold text-foreground flex items-center gap-1.5">
                 <History className="h-3.5 w-3.5 text-primary" />
                 Previous Version Receipt Hash
               </span>
-              <p className="font-mono text-xs break-all text-muted-foreground">
+              <p className="font-mono text-xs break-all text-muted-foreground select-all">
                 {approvedData.receipt.previousReceiptHash || "Genesis Version (No previous receipt)"}
               </p>
             </div>
@@ -499,15 +519,13 @@ export default function HandoverPage({
 
       {/* Main Content Loading State */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-16 text-muted-foreground">
-          <Loader2 className="h-8 w-8 animate-spin mb-3 text-primary" />
-          <p className="text-sm">Assembling proof-carrying handover...</p>
-        </div>
+        <TableSkeleton rows={6} />
       ) : !currentDisplayHandover ? (
-        <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
-          <AlertCircle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="font-medium">No handover data found for this selection.</p>
-        </div>
+        <EmptyState
+          type="no-data"
+          title="No handover data available"
+          description="Upload project documents, extract candidate claims, and approve evidence to construct a handover snapshot."
+        />
       ) : (
         /* The 14 Handover Sections */
         <div className="space-y-4">
@@ -517,17 +535,17 @@ export default function HandoverPage({
             return (
               <div
                 key={section.id}
-                className="rounded-xl border bg-card shadow-sm overflow-hidden"
+                className="rounded-xl border border-border bg-card shadow-xs overflow-hidden"
               >
                 {/* Section Header */}
                 <button
                   type="button"
                   onClick={() => toggleSection(section.id)}
-                  className="w-full flex items-center justify-between p-4 bg-muted/20 hover:bg-muted/40 transition-colors text-left"
+                  className="w-full flex items-center justify-between p-4 bg-slate-50/75 dark:bg-slate-900/50 hover:bg-slate-100/75 dark:hover:bg-slate-900/80 transition-colors text-left cursor-pointer"
                 >
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2.5">
-                      <span className="font-semibold text-base text-foreground">
+                      <span className="font-semibold text-sm text-foreground">
                         {section.title}
                       </span>
                       {section.hasContent ? (
@@ -535,7 +553,7 @@ export default function HandoverPage({
                           {section.items.length} item{section.items.length !== 1 ? "s" : ""}
                         </span>
                       ) : (
-                        <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[11px]">
+                        <span className="rounded-full bg-slate-100 dark:bg-slate-800 text-muted-foreground px-2 py-0.5 text-[11px]">
                           Empty
                         </span>
                       )}
@@ -545,16 +563,16 @@ export default function HandoverPage({
 
                   <div className="text-muted-foreground">
                     {isExpanded ? (
-                      <ChevronUp className="h-5 w-5" />
+                      <ChevronUp className="h-4 w-4" />
                     ) : (
-                      <ChevronDown className="h-5 w-5" />
+                      <ChevronDown className="h-4 w-4" />
                     )}
                   </div>
                 </button>
 
                 {/* Section Content */}
                 {isExpanded && (
-                  <div className="p-4 border-t divide-y divide-border/60">
+                  <div className="p-4 border-t border-border divide-y divide-border/60">
                     {!section.hasContent ? (
                       <div className="py-4 text-center text-xs italic text-muted-foreground">
                         [{section.emptyNotice || "No approved information"}]
@@ -564,7 +582,7 @@ export default function HandoverPage({
                         {section.items.map((item) => (
                           <div
                             key={item.id}
-                            className="rounded-lg border bg-background/50 p-3.5 space-y-2.5 text-xs shadow-none"
+                            className="rounded-xl border border-border bg-slate-50/40 dark:bg-slate-900/30 p-4 space-y-3 text-xs"
                           >
                             {/* Item Header */}
                             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -573,32 +591,32 @@ export default function HandoverPage({
                                   {item.subject}
                                 </span>
                                 <span className="text-muted-foreground">→</span>
-                                <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-foreground">
+                                <code className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-xs font-mono text-foreground">
                                   {item.attribute}
                                 </code>
                               </div>
                               <div className="flex items-center gap-2">
                                 {renderStatusBadge(item.evidenceStatus)}
-                                <span className="rounded bg-muted text-foreground px-2 py-0.5 text-xs font-medium">
+                                <span className="rounded bg-slate-100 dark:bg-slate-800 text-foreground px-2 py-0.5 text-xs font-medium">
                                   {item.reviewState}
                                 </span>
                               </div>
                             </div>
 
                             {/* Item Value */}
-                            <div className="p-2.5 rounded bg-muted/30 border border-muted text-xs">
+                            <div className="p-2.5 rounded-lg bg-card border border-border text-xs">
                               <span className="font-semibold text-foreground">Value: </span>
                               <span className="text-foreground">{item.valueRaw}</span>
                               {item.valueNormalized && item.valueNormalized !== item.valueRaw && (
                                 <span className="text-muted-foreground ml-2">
-                                  (Normalized: <code>{item.valueNormalized}</code>)
+                                  (Normalized: <code className="font-mono text-foreground">{item.valueNormalized}</code>)
                                 </span>
                               )}
                             </div>
 
                             {/* Reviewer Written Reason if accepted with weaker evidence */}
                             {item.reviewerReason && (
-                              <div className="rounded bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 p-2 text-amber-900 dark:text-amber-200 text-xs">
+                              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 p-2.5 text-amber-900 dark:text-amber-200 text-xs">
                                 <span className="font-semibold">Reviewer Justification: </span>
                                 {item.reviewerReason}
                               </div>
@@ -613,17 +631,18 @@ export default function HandoverPage({
                                 {item.evidence.map((ev, i) => (
                                   <div
                                     key={i}
-                                    className="rounded border bg-card p-2 text-xs space-y-1"
+                                    className="rounded-lg border border-border/80 bg-card p-2.5 text-xs space-y-1 shadow-xs"
                                   >
                                     <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                                      <span className="font-medium text-foreground">
+                                      <span className="font-medium text-foreground flex items-center gap-1">
+                                        <FileText className="h-3 w-3 text-primary" />
                                         {ev.fileName || "Document"} ({ev.location})
                                       </span>
                                       <span className="font-mono text-[10px]">
                                         SHA-256: {ev.documentChecksum.slice(0, 10)}...
                                       </span>
                                     </div>
-                                    <blockquote className="border-l-2 border-primary/40 pl-2 text-muted-foreground italic bg-muted/10 py-0.5">
+                                    <blockquote className="border-l-2 border-primary/40 pl-2 text-muted-foreground italic bg-slate-50/50 dark:bg-slate-900/20 py-0.5">
                                       &ldquo;{ev.excerpt}&rdquo;
                                     </blockquote>
                                   </div>
@@ -644,178 +663,153 @@ export default function HandoverPage({
 
       {/* Approval Confirmation Modal */}
       {approvalModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2 font-bold text-foreground text-base">
-                <Lock className="h-5 w-5 text-primary" />
-                Approve Handover & Mint Receipt
-              </div>
-              <button
-                onClick={() => setApprovalModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        <Modal
+          isOpen={approvalModalOpen}
+          onClose={() => setApprovalModalOpen(false)}
+          title="Approve Handover & Mint Receipt"
+          description="Lock all accepted claims into an immutable canonical snapshot with a cryptographic SHA-256 receipt."
+        >
+          <form onSubmit={handleApproveSubmit} className="space-y-4 text-xs">
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">
+                Custom Handover Title (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Q4 Architectural Handover"
+                value={customTitle}
+                onChange={(e) => setCustomTitle(e.target.value)}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+              />
             </div>
 
-            <form onSubmit={handleApproveSubmit} className="space-y-4 text-xs">
-              <p className="text-muted-foreground">
-                This action will lock all currently accepted claims into an immutable canonical
-                snapshot and calculate a cryptographic SHA-256 integrity receipt in one atomic transaction.
-              </p>
-
-              <div className="space-y-1">
-                <label className="font-semibold text-foreground">
-                  Custom Handover Title (optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Q4 Architectural Handover"
-                  value={customTitle}
-                  onChange={(e) => setCustomTitle(e.target.value)}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+            <div className="rounded-xl bg-slate-50 dark:bg-slate-900/60 p-3.5 space-y-1.5 border border-border">
+              <div className="font-semibold text-foreground">Handover Invariant Check:</div>
+              <div className="text-muted-foreground">
+                • Total Claims to Seal:{" "}
+                <strong className="text-foreground">{draftData?.draft?.totalClaimsCount ?? 0}</strong>
               </div>
-
-              <div className="rounded-lg bg-muted/40 p-3 space-y-1 border">
-                <div className="font-semibold text-foreground">Handover Invariant Check:</div>
-                <div className="text-muted-foreground">
-                  • Total Claims to Seal:{" "}
-                  <strong>{draftData?.draft?.totalClaimsCount ?? 0}</strong>
-                </div>
-                <div className="text-muted-foreground">
-                  • Verified Claims:{" "}
-                  <strong>{draftData?.draft?.verifiedClaimsCount ?? 0}</strong>
-                </div>
-                <div className="text-muted-foreground">
-                  • Open Conflicts Remaining:{" "}
-                  <strong>{draftData?.unresolvedConflictCount ?? 0}</strong>
-                </div>
+              <div className="text-muted-foreground">
+                • Verified Claims:{" "}
+                <strong className="text-foreground">{draftData?.draft?.verifiedClaimsCount ?? 0}</strong>
               </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setApprovalModalOpen(false)}
-                  className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={approving}
-                  className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-1.5"
-                >
-                  {approving ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Approving...
-                    </>
-                  ) : (
-                    "Confirm & Approve"
-                  )}
-                </button>
+              <div className="text-muted-foreground">
+                • Open Conflicts Remaining:{" "}
+                <strong className="text-foreground">{draftData?.unresolvedConflictCount ?? 0}</strong>
               </div>
-            </form>
-          </div>
-        </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setApprovalModalOpen(false)}
+                className="rounded-lg border border-border px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={approving}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-colors disabled:opacity-40 cursor-pointer"
+              >
+                {approving ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Approving...
+                  </>
+                ) : (
+                  "Confirm & Approve"
+                )}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* Verify Receipt Result Modal */}
       {verifyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-xl border bg-card p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2 font-bold text-foreground text-base">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-                Receipt Cryptographic Verification
-              </div>
-              <button
-                onClick={() => setVerifyModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        <Modal
+          isOpen={verifyModalOpen}
+          onClose={() => setVerifyModalOpen(false)}
+          title="Receipt Cryptographic Verification"
+          description="Independent 2-way verification of snapshot integrity and live database claims."
+        >
+          {verifying ? (
+            <div className="flex flex-col items-center justify-center py-10 space-y-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">
+                Recomputing SHA-256 hash across canonical snapshot and database claims...
+              </p>
             </div>
-
-            {verifying ? (
-              <div className="flex flex-col items-center justify-center py-10 space-y-3">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-xs text-muted-foreground">
-                  Recomputing SHA-256 hash across canonical snapshot and database claims...
-                </p>
-              </div>
-            ) : verifyResult ? (
-              <div className="space-y-4 text-xs">
-                {verifyResult.valid ? (
-                  <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 flex items-start gap-3 text-emerald-900 dark:text-emerald-200">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <div className="font-semibold text-sm">Receipt Cryptographically Verified</div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {verifyResult.explanation}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 flex items-start gap-3 text-rose-900 dark:text-rose-200">
-                    <ShieldAlert className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
-                    <div>
-                      <div className="font-semibold text-sm">Integrity Discrepancy Detected</div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {verifyResult.explanation}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2 rounded-lg bg-muted/30 p-3 border">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Check 1: Stored Snapshot Integrity:</span>
-                    <span
-                      className={`font-semibold ${
-                        verifyResult.snapshotIntegrity ? "text-emerald-600" : "text-rose-600"
-                      }`}
-                    >
-                      {verifyResult.snapshotIntegrity ? "PASS (Exact Match)" : "FAIL (Tampered)"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Check 2: Live Database Claims Integrity:</span>
-                    <span
-                      className={`font-semibold ${
-                        verifyResult.liveDataIntegrity ? "text-emerald-600" : "text-amber-600"
-                      }`}
-                    >
-                      {verifyResult.liveDataIntegrity ? "PASS (Synchronized)" : "DRIFT (Modified Post-Approval)"}
-                    </span>
+          ) : verifyResult ? (
+            <div className="space-y-4 text-xs">
+              {verifyResult.valid ? (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 p-4 flex items-start gap-3 text-emerald-900 dark:text-emerald-200">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-semibold text-sm">Receipt Cryptographically Verified</div>
+                    <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+                      {verifyResult.explanation}
+                    </p>
                   </div>
                 </div>
-
-                <div className="space-y-1.5 font-mono text-[11px] bg-muted/40 p-3 rounded-lg border">
+              ) : (
+                <div className="rounded-xl border border-rose-500/30 bg-rose-50/50 dark:bg-rose-950/20 p-4 flex items-start gap-3 text-rose-900 dark:text-rose-200">
+                  <ShieldAlert className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-muted-foreground">Receipt Hash: </span>
-                    <span className="text-foreground">{verifyResult.storedHash}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Computed Hash: </span>
-                    <span className="text-primary">{verifyResult.computedSnapshotHash}</span>
+                    <div className="font-semibold text-sm">Integrity Discrepancy Detected</div>
+                    <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
+                      {verifyResult.explanation}
+                    </p>
                   </div>
                 </div>
+              )}
 
-                <div className="flex justify-end pt-2">
-                  <button
-                    onClick={() => setVerifyModalOpen(false)}
-                    className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+              <div className="space-y-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 p-3.5 border border-border">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Check 1: Stored Snapshot Integrity:</span>
+                  <span
+                    className={`font-semibold ${
+                      verifyResult.snapshotIntegrity ? "text-emerald-600" : "text-rose-600"
+                    }`}
                   >
-                    Done
-                  </button>
+                    {verifyResult.snapshotIntegrity ? "PASS (Exact Match)" : "FAIL (Tampered)"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Check 2: Live Database Claims Integrity:</span>
+                  <span
+                    className={`font-semibold ${
+                      verifyResult.liveDataIntegrity ? "text-emerald-600" : "text-amber-600"
+                    }`}
+                  >
+                    {verifyResult.liveDataIntegrity ? "PASS (Synchronized)" : "DRIFT (Modified Post-Approval)"}
+                  </span>
                 </div>
               </div>
-            ) : null}
-          </div>
-        </div>
+
+              <div className="space-y-1.5 font-mono text-[11px] bg-slate-100 dark:bg-slate-800 p-3 rounded-lg border border-border">
+                <div>
+                  <span className="text-muted-foreground">Receipt Hash: </span>
+                  <span className="text-foreground break-all">{verifyResult.storedHash}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Computed Hash: </span>
+                  <span className="text-primary break-all font-semibold">{verifyResult.computedSnapshotHash}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => setVerifyModalOpen(false)}
+                  className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </Modal>
       )}
     </div>
   );

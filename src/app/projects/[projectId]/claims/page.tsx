@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react";
+import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/date";
+import { PageHeader } from "@/components/ui/page-header";
+import { MetricCard } from "@/components/ui/metric-card";
+import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
+import { FilterPills } from "@/components/ui/filter-pills";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle,
   AlertTriangle,
@@ -10,16 +18,17 @@ import {
   ChevronRight,
   Edit3,
   Eye,
-  FileQuestion,
   FileText,
   Filter,
   HelpCircle,
   Loader2,
-  Play,
   RotateCw,
   ShieldAlert,
   ShieldCheck,
   X,
+  Search,
+  Layers,
+  GitCompare,
 } from "lucide-react";
 
 interface VerificationItem {
@@ -126,14 +135,6 @@ const ATTRIBUTES = [
   "rationale",
 ];
 
-const EVIDENCE_STATUSES = [
-  "VERIFIED",
-  "WEAK_SUPPORT",
-  "CONFLICTING",
-  "UNVERIFIED",
-  "UNKNOWN",
-];
-
 export default function ClaimsPage({
   params,
 }: {
@@ -153,10 +154,11 @@ export default function ClaimsPage({
   const [total, setTotal] = useState(0);
 
   // Filters
+  const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [attributeFilter, setAttributeFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [injectionOnly, setInjectionOnly] = useState(false);
   const [needsNormOnly, setNeedsNormOnly] = useState(false);
 
@@ -182,7 +184,7 @@ export default function ClaimsPage({
       if (categoryFilter) qs.set("category", categoryFilter);
       if (attributeFilter) qs.set("attributeKey", attributeFilter);
       if (entityFilter) qs.set("entityId", entityFilter);
-      if (statusFilter) qs.set("evidenceStatus", statusFilter);
+      if (statusFilter && statusFilter !== "ALL") qs.set("evidenceStatus", statusFilter);
       if (injectionOnly) qs.set("injectionFlag", "true");
       if (needsNormOnly) qs.set("needsNormalization", "true");
 
@@ -315,7 +317,7 @@ export default function ClaimsPage({
   function renderStatusBadge(latestVerification?: VerificationItem) {
     if (!latestVerification) {
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-muted text-muted-foreground px-2 py-0.5 text-xs font-medium">
+        <span className="inline-flex items-center gap-1 rounded bg-slate-100 dark:bg-slate-800 text-muted-foreground px-2 py-0.5 text-xs font-medium">
           <HelpCircle className="h-3 w-3" /> Unchecked
         </span>
       );
@@ -326,44 +328,40 @@ export default function ClaimsPage({
         return (
           <button
             onClick={() => setInspectingVerification(latestVerification)}
-            className="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
-            title="Click to inspect 4-gate verification breakdown"
+            className="cursor-pointer"
+            title="Inspect 4-gate verification proof"
           >
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-            VERIFIED
+            <Badge variant="verified">VERIFIED</Badge>
           </button>
         );
       case "WEAK_SUPPORT":
         return (
           <button
             onClick={() => setInspectingVerification(latestVerification)}
-            className="inline-flex items-center gap-1 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
-            title="Click to inspect 4-gate verification breakdown"
+            className="cursor-pointer"
+            title="Inspect 4-gate verification proof"
           >
-            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-            WEAK SUPPORT
+            <Badge variant="weak">WEAK SUPPORT</Badge>
           </button>
         );
       case "CONFLICTING":
         return (
           <button
             onClick={() => setInspectingVerification(latestVerification)}
-            className="inline-flex items-center gap-1 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
-            title="Click to inspect 4-gate verification breakdown"
+            className="cursor-pointer"
+            title="Inspect 4-gate verification proof"
           >
-            <AlertCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
-            CONFLICTING
+            <Badge variant="contradicted">CONFLICTING</Badge>
           </button>
         );
       case "UNVERIFIED":
         return (
           <button
             onClick={() => setInspectingVerification(latestVerification)}
-            className="inline-flex items-center gap-1 rounded bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
-            title="Click to inspect 4-gate verification breakdown"
+            className="cursor-pointer"
+            title="Inspect 4-gate verification proof"
           >
-            <FileQuestion className="h-3.5 w-3.5 text-slate-500" />
-            UNVERIFIED
+            <Badge variant="unverified">UNVERIFIED</Badge>
           </button>
         );
       case "UNKNOWN":
@@ -371,15 +369,30 @@ export default function ClaimsPage({
         return (
           <button
             onClick={() => setInspectingVerification(latestVerification)}
-            className="inline-flex items-center gap-1 rounded bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 px-2 py-0.5 text-xs font-semibold hover:opacity-85 transition-opacity"
-            title="Click to inspect 4-gate verification breakdown"
+            className="cursor-pointer"
+            title="Inspect 4-gate verification proof"
           >
-            <HelpCircle className="h-3.5 w-3.5 text-purple-600" />
-            UNKNOWN
+            <Badge variant="neutral">UNKNOWN</Badge>
           </button>
         );
     }
   }
+
+  // Filtered by local search query if typed
+  const displayedClaims = claims.filter((claim) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      claim.subjectEntity.canonicalName.toLowerCase().includes(q) ||
+      claim.attributeKey.toLowerCase().includes(q) ||
+      claim.valueRaw.toLowerCase().includes(q) ||
+      (claim.valueNormalized && claim.valueNormalized.toLowerCase().includes(q))
+    );
+  });
+
+  const verifiedCount = claims.filter((c) => c.verifications?.[0]?.status === "VERIFIED").length;
+  const conflictingCount = claims.filter((c) => c.verifications?.[0]?.status === "CONFLICTING").length;
+  const needsNormCount = claims.filter((c) => !c.valueNormalized).length;
 
   if (forbidden) {
     return (
@@ -392,51 +405,56 @@ export default function ClaimsPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Claim Registry & Verification</h1>
-          <p className="text-sm text-muted-foreground">
-            Structured candidate claims extracted from authorized documents, evaluated with 4-gate evidence proof.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-50"
-          >
-            <RotateCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-
-          <button
-            onClick={handleVerifyAllClaims}
-            disabled={batchVerifying || claims.length === 0}
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50"
-          >
-            {batchVerifying ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Verifying All Claims...
-              </>
-            ) : (
-              <>
-                <Play className="h-3.5 w-3.5" />
-                Verify All Claims
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        breadcrumbs={
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Link href="/dashboard" className="hover:text-foreground">Projects</Link>
+            <span>/</span>
+            <Link href={`/projects/${projectId}`} className="hover:text-foreground">Project</Link>
+            <span>/</span>
+            <span className="text-foreground font-medium">Claims & Evidence</span>
+          </div>
+        }
+        title="Claim Registry & Evidence"
+        description="Structured candidate claims extracted from authoritative documents, evaluated through 4-gate deterministic evidence proof."
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+            <button
+              onClick={handleVerifyAllClaims}
+              disabled={batchVerifying || claims.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {batchVerifying ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Verifying All Claims...
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="h-4 w-4" />
+                  Verify All Claims
+                </>
+              )}
+            </button>
+          </div>
+        }
+      />
 
       {/* Notifications */}
       {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center justify-between">
+        <div role="alert" className="flex items-center justify-between gap-2 rounded-lg border border-rose-500/20 bg-rose-50/50 p-4 text-xs font-medium text-rose-800 dark:bg-rose-950/20 dark:text-rose-300">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
           <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
@@ -444,7 +462,7 @@ export default function ClaimsPage({
       )}
 
       {success && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/20 bg-emerald-50/50 p-4 text-xs font-medium text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
             <span>{success}</span>
@@ -453,111 +471,168 @@ export default function ClaimsPage({
         </div>
       )}
 
-      {/* Filters Bar */}
-      <div className="rounded-xl border bg-card p-4 flex flex-wrap items-center gap-3 text-xs">
-        <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
-          <Filter className="h-3.5 w-3.5" /> Filters:
+      {/* Metric Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          title="Total Claims"
+          value={total}
+          subtitle="Candidate facts extracted"
+          icon={Layers}
+        />
+        <MetricCard
+          title="Verified Claims"
+          value={verifiedCount}
+          subtitle="Passes 4-gate evidence proof"
+          variant={verifiedCount > 0 ? "success" : "default"}
+          icon={ShieldCheck}
+        />
+        <MetricCard
+          title="Conflicting Claims"
+          value={conflictingCount}
+          subtitle="Contradictions found in corpus"
+          variant={conflictingCount > 0 ? "danger" : "default"}
+          icon={GitCompare}
+        />
+        <MetricCard
+          title="Needs Normalization"
+          value={needsNormCount}
+          subtitle={needsNormCount === 0 ? "All values normalized" : "Unmapped raw terms"}
+          variant={needsNormCount > 0 ? "warning" : "default"}
+          icon={AlertTriangle}
+        />
+      </div>
+
+      {/* Filter Pills Toolbar */}
+      <div className="space-y-3 pt-2">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+          <FilterPills
+            options={[
+              { id: "ALL", label: "All Statuses", count: total },
+              { id: "VERIFIED", label: "Verified", count: verifiedCount },
+              { id: "WEAK_SUPPORT", label: "Weak Support" },
+              { id: "CONFLICTING", label: "Conflicting", count: conflictingCount },
+              { id: "UNVERIFIED", label: "Unverified" },
+            ]}
+            selectedId={statusFilter}
+            onSelect={(id) => {
+              setPage(1);
+              setStatusFilter(id);
+            }}
+          />
+
+          <div className="relative min-w-[240px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search entity, attribute, value..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+            />
+          </div>
         </div>
 
-        <select
-          value={categoryFilter}
-          onChange={(e) => {
-            setPage(1);
-            setCategoryFilter(e.target.value);
-          }}
-          className="rounded-md border border-input bg-background px-2.5 py-1.5 text-xs"
-          aria-label="Filter by category"
-        >
-          <option value="">All Categories</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+        {/* Secondary filters */}
+        <div className="rounded-xl border border-border/80 bg-card p-3 flex flex-wrap items-center gap-3 text-xs">
+          <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+            <Filter className="h-3.5 w-3.5" /> Dimensions:
+          </div>
 
-        <select
-          value={attributeFilter}
-          onChange={(e) => {
-            setPage(1);
-            setAttributeFilter(e.target.value);
-          }}
-          className="rounded-md border border-input bg-background px-2.5 py-1.5 text-xs"
-          aria-label="Filter by attribute"
-        >
-          <option value="">All Attributes</option>
-          {ATTRIBUTES.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
-
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setPage(1);
-            setStatusFilter(e.target.value);
-          }}
-          className="rounded-md border border-input bg-background px-2.5 py-1.5 text-xs"
-          aria-label="Filter by evidence status"
-        >
-          <option value="">All Evidence Statuses</option>
-          {EVIDENCE_STATUSES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-
-        <select
-          value={entityFilter}
-          onChange={(e) => {
-            setPage(1);
-            setEntityFilter(e.target.value);
-          }}
-          className="rounded-md border border-input bg-background px-2.5 py-1.5 text-xs max-w-[200px]"
-          aria-label="Filter by entity"
-        >
-          <option value="">All Entities</option>
-          {entities.map((en) => (
-            <option key={en.id} value={en.id}>
-              {en.canonicalName} ({en.type})
-            </option>
-          ))}
-        </select>
-
-        <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer select-none px-2">
-          <input
-            type="checkbox"
-            checked={injectionOnly}
+          <select
+            value={categoryFilter}
             onChange={(e) => {
               setPage(1);
-              setInjectionOnly(e.target.checked);
+              setCategoryFilter(e.target.value);
             }}
-          />
-          Injection Flagged Only
-        </label>
+            className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground shadow-xs"
+            aria-label="Filter by category"
+          >
+            <option value="">All Categories</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
 
-        <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer select-none px-2">
-          <input
-            type="checkbox"
-            checked={needsNormOnly}
+          <select
+            value={attributeFilter}
             onChange={(e) => {
               setPage(1);
-              setNeedsNormOnly(e.target.checked);
+              setAttributeFilter(e.target.value);
             }}
-          />
-          Needs Normalisation
-        </label>
+            className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground shadow-xs"
+            aria-label="Filter by attribute"
+          >
+            <option value="">All Attributes</option>
+            {ATTRIBUTES.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+
+          <select
+            value={entityFilter}
+            onChange={(e) => {
+              setPage(1);
+              setEntityFilter(e.target.value);
+            }}
+            className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground max-w-[200px] shadow-xs"
+            aria-label="Filter by entity"
+          >
+            <option value="">All Entities</option>
+            {entities.map((en) => (
+              <option key={en.id} value={en.id}>
+                {en.canonicalName} ({en.type})
+              </option>
+            ))}
+          </select>
+
+          <div className="h-4 w-px bg-border mx-1" />
+
+          <label className="inline-flex items-center gap-1.5 text-xs text-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={injectionOnly}
+              onChange={(e) => {
+                setPage(1);
+                setInjectionOnly(e.target.checked);
+              }}
+              className="rounded border-border text-primary"
+            />
+            <span>Injection Flagged</span>
+          </label>
+
+          <label className="inline-flex items-center gap-1.5 text-xs text-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={needsNormOnly}
+              onChange={(e) => {
+                setPage(1);
+                setNeedsNormOnly(e.target.checked);
+              }}
+              className="rounded border-border text-primary"
+            />
+            <span>Needs Normalization</span>
+          </label>
+        </div>
       </div>
 
       {/* Claims List */}
-      {claims.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-card p-12 text-center text-muted-foreground space-y-2">
-          <FileText className="h-10 w-10 mx-auto opacity-40" />
-          <p className="text-sm font-medium text-foreground">No candidate claims match these filters</p>
-          <p className="text-xs">
-            Upload and process a document under the Documents tab, then click &ldquo;Run Extraction&rdquo;.
-          </p>
-        </div>
+      {loading && !claims.length ? (
+        <TableSkeleton rows={6} />
+      ) : displayedClaims.length === 0 ? (
+        <EmptyState
+          type={total === 0 ? "no-data" : "checked-empty"}
+          title={total === 0 ? "No claims extracted yet" : "No claims match current filters"}
+          description={
+            total === 0
+              ? "Upload documentation in the Documents workspace and click 'Extract' to generate candidate claims."
+              : "Try relaxing your category, attribute, or evidence status filters to view claims."
+          }
+          actionHref={`/projects/${projectId}/documents`}
+          actionLabel={total === 0 ? "Go to Documents" : undefined}
+        />
       ) : (
         <div className="space-y-3">
-          {claims.map((claim) => {
+          {displayedClaims.map((claim) => {
             const ev = claim.evidence[0];
             const latestVerification = claim.verifications?.[0];
             const isVerifying = verifyingClaimId === claim.id;
@@ -565,96 +640,102 @@ export default function ClaimsPage({
             return (
               <div
                 key={claim.id}
-                className="rounded-xl border bg-card p-5 shadow-sm space-y-3 hover:border-primary/40 transition-colors"
+                className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-3 hover:border-primary/40 transition-all"
               >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="space-y-1">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-semibold">
+                      <span className="rounded-md bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
                         {claim.category}
                       </span>
-                      <span className="font-semibold text-sm">
+                      <span className="font-semibold text-sm text-foreground">
                         {claim.subjectEntity.canonicalName}
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground font-mono">
                         .{claim.attributeKey} =
                       </span>
                       {claim.valueNormalized ? (
-                        <span className="rounded bg-muted px-2 py-0.5 text-xs font-mono font-semibold">
+                        <span className="rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-mono font-semibold text-foreground">
                           {claim.valueNormalized}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5 text-xs font-medium">
-                          <AlertTriangle className="h-3 w-3" /> needs normalisation ({claim.valueRaw})
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-xs font-medium border border-amber-200/60">
+                          <AlertTriangle className="h-3 w-3 text-amber-600" />
+                          needs normalization ({claim.valueRaw})
                         </span>
                       )}
                       {claim.subjectEntity.needsReview && (
-                        <span className="rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5 text-[10px] font-semibold">
-                          Entity Needs Review
-                        </span>
+                        <Badge variant="warning">Entity Needs Review</Badge>
                       )}
                       {claim.injectionFlag && (
-                        <span className="inline-flex items-center gap-1 rounded bg-destructive/10 text-destructive px-2 py-0.5 text-[10px] font-semibold">
-                          <ShieldAlert className="h-3 w-3" /> Injection Flagged
-                        </span>
+                        <Badge variant="destructive">
+                          <ShieldAlert className="h-3 w-3 mr-1" />
+                          Injection Flagged
+                        </Badge>
                       )}
                     </div>
 
                     {claim.valueNormalized && claim.valueNormalized !== claim.valueRaw && (
-                      <p className="text-xs text-muted-foreground">Raw value: &ldquo;{claim.valueRaw}&rdquo;</p>
+                      <p className="text-xs text-muted-foreground">
+                        Raw extract: <span className="italic text-foreground">&ldquo;{claim.valueRaw}&rdquo;</span>
+                      </p>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     {/* Machine Evidence Status */}
                     {renderStatusBadge(latestVerification)}
 
                     {/* Human Review State */}
-                    <span className="text-[11px] text-muted-foreground bg-muted px-2 py-0.5 rounded" title="Human Review Decision">
-                      v{claim.version} · {claim.reviewState}
+                    <span className="text-[11px] font-medium text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md" title="Human Review Decision">
+                      v{claim.version} • {claim.reviewState}
                     </span>
 
                     {/* Verify Single Claim Button */}
                     <button
                       onClick={() => handleVerifySingleClaim(claim.id)}
                       disabled={isVerifying}
-                      className="inline-flex items-center gap-1 rounded border border-emerald-600/30 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 text-xs font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-1 rounded-md border border-emerald-600/30 bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 text-xs font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors disabled:opacity-50 cursor-pointer"
+                      title="Run 4-gate verification on this single claim"
                     >
                       {isVerifying ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />
                       ) : (
-                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
                       )}
-                      {latestVerification ? "Re-verify" : "Verify"}
+                      <span>{latestVerification ? "Re-verify" : "Verify"}</span>
                     </button>
 
                     <button
                       onClick={() => openDetail(claim.id)}
-                      className="inline-flex items-center gap-1 rounded border px-2.5 py-1 text-xs font-medium hover:bg-muted transition-colors"
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Inspect full claim details and chunk context"
                     >
-                      <Eye className="h-3.5 w-3.5" /> Inspect
+                      <Eye className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => startEdit(claim)}
-                      className="inline-flex items-center gap-1 rounded border px-2.5 py-1 text-xs font-medium hover:bg-muted transition-colors"
+                      className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Edit claim and create new version"
                     >
-                      <Edit3 className="h-3.5 w-3.5" /> Edit
+                      <Edit3 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
 
                 {ev && (
-                  <div className="rounded-lg bg-muted/40 border p-3 text-xs space-y-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-muted-foreground font-medium">
-                      <span>
+                  <div className="rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-border/80 p-3 text-xs space-y-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <FileText className="h-3 w-3 text-primary" />
                         Source: <strong className="text-foreground">{ev.document.fileName}</strong> ({ev.sourceLocation})
                       </span>
                       <span>
-                        Date basis: {ev.document.sourceDateBasis}
+                        Date basis: <strong className="text-foreground font-mono">{ev.document.sourceDateBasis}</strong>
                         {ev.document.sourceDate ? ` (${formatDate(ev.document.sourceDate)})` : ""}
                       </span>
                     </div>
-                    <blockquote className="italic text-foreground/90 border-l-2 border-primary/40 pl-2.5">
+                    <blockquote className="italic text-foreground border-l-2 border-primary/50 pl-2.5 py-0.5 text-xs">
                       &ldquo;{ev.excerpt}&rdquo;
                     </blockquote>
                   </div>
@@ -667,252 +748,273 @@ export default function ClaimsPage({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
+        <div className="flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
           <span>
-            Page {page} of {totalPages} ({total} total claims)
+            Page <strong className="text-foreground">{page}</strong> of{" "}
+            <strong className="text-foreground">{totalPages}</strong> ({total} total claims)
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="rounded border p-1.5 disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-3.5 w-3.5" /> Previous
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="rounded border p-1.5 disabled:opacity-40"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
-              <ChevronRight className="h-4 w-4" />
+              Next <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Proof-Carrying Evidence Gate Breakdown Modal */}
+      {/* 4-Gate Verification Proof Modal */}
       {inspectingVerification && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl rounded-xl border bg-card p-6 shadow-xl space-y-5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-base">Proof-Carrying Verification Gates</h3>
-              </div>
-              <button
-                onClick={() => setInspectingVerification(null)}
-                className="rounded p-1 hover:bg-muted text-muted-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
+        <Modal
+          isOpen={!!inspectingVerification}
+          onClose={() => setInspectingVerification(null)}
+          title="Proof-Carrying Verification Gates"
+          description="Detailed deterministic verification results across all 4 evidence gates."
+          maxWidth="2xl"
+        >
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="flex items-center justify-between rounded-xl bg-slate-50 dark:bg-slate-900/60 p-3.5 border border-border">
+              <span className="text-xs font-semibold text-foreground">Synthesis Evidence Status:</span>
+              {renderStatusBadge(inspectingVerification)}
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-lg bg-muted/40 p-3">
-                <span className="text-xs font-semibold">Final Evidence Status:</span>
-                {renderStatusBadge(inspectingVerification)}
+            {/* Gate 1 */}
+            <div className="rounded-xl border border-border p-3.5 space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-foreground">Gate 1: Source Document Existence</span>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                  inspectingVerification.sourceGate === "PASS"
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
+                }`}>
+                  {inspectingVerification.sourceGate}
+                </span>
               </div>
+              <p className="text-xs text-muted-foreground">{inspectingVerification.sourceGateReason || "Verified present in active corpus."}</p>
+            </div>
 
-              {/* Gate 1 */}
-              <div className="rounded-lg border p-3 space-y-1">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span>Gate 1: Source Document Existence</span>
-                  <span className={`px-2 py-0.5 rounded text-[11px] ${inspectingVerification.sourceGate === "PASS" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                    {inspectingVerification.sourceGate}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">{inspectingVerification.sourceGateReason || "N/A"}</p>
+            {/* Gate 2 */}
+            <div className="rounded-xl border border-border p-3.5 space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-foreground">Gate 2: Verbatim / Normalized Quote Match</span>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                  inspectingVerification.quoteGate === "PASS"
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
+                }`}>
+                  {inspectingVerification.quoteGate}{" "}
+                  {inspectingVerification.quoteSimilarity !== null ? `(${Math.round(inspectingVerification.quoteSimilarity * 100)}% match)` : ""}
+                </span>
               </div>
+              <p className="text-xs text-muted-foreground">{inspectingVerification.quoteGateReason || "Direct citation matched in chunk."}</p>
+            </div>
 
-              {/* Gate 2 */}
-              <div className="rounded-lg border p-3 space-y-1">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span>Gate 2: Verbatim / Normalized Quote Existence</span>
-                  <span className={`px-2 py-0.5 rounded text-[11px] ${inspectingVerification.quoteGate === "PASS" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                    {inspectingVerification.quoteGate} {inspectingVerification.quoteSimilarity !== null ? `(${Math.round(inspectingVerification.quoteSimilarity * 100)}%)` : ""}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">{inspectingVerification.quoteGateReason || "N/A"}</p>
+            {/* Gate 3 */}
+            <div className="rounded-xl border border-border p-3.5 space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-foreground">Gate 3: Independent Semantic Support Judge</span>
+                <span className="px-2 py-0.5 rounded text-[11px] bg-slate-100 dark:bg-slate-800 font-mono font-semibold text-foreground">
+                  {inspectingVerification.semanticGate || "SKIPPED"}
+                </span>
               </div>
-
-              {/* Gate 3 */}
-              <div className="rounded-lg border p-3 space-y-1">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span>Gate 3: Independent Semantic Support Judge</span>
-                  <span className="px-2 py-0.5 rounded text-[11px] bg-muted font-mono">
-                    {inspectingVerification.semanticGate || "SKIPPED"}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">{inspectingVerification.semanticReason || "N/A"}</p>
-                {inspectingVerification.judgeModel && (
-                  <p className="text-[11px] text-muted-foreground/80 font-mono">
-                    Model: {inspectingVerification.judgeModel} · Prompt: {inspectingVerification.judgePromptVersion}
-                  </p>
-                )}
-              </div>
-
-              {/* Gate 4 */}
-              <div className="rounded-lg border p-3 space-y-1">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span>Gate 4: Contradiction / Conflict Scan</span>
-                  <span className={`px-2 py-0.5 rounded text-[11px] ${inspectingVerification.contradictionGate === "PASS" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                    {inspectingVerification.contradictionGate === "PASS" ? "NO CONFLICTS" : "OPEN CONFLICT DETECTED"}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Active pairwise conflicts detected: {inspectingVerification.contradictionCount}
+              <p className="text-xs text-muted-foreground">{inspectingVerification.semanticReason || "Deterministic rules satisfied."}</p>
+              {inspectingVerification.judgeModel && (
+                <p className="text-[11px] text-muted-foreground/80 font-mono">
+                  Judge Model: {inspectingVerification.judgeModel} • Prompt v{inspectingVerification.judgePromptVersion}
                 </p>
-              </div>
+              )}
+            </div>
 
-              <div className="text-[11px] text-muted-foreground text-right pt-2 border-t">
-                Rule set version: {inspectingVerification.ruleSetVersion} · Verified: {formatDateTime(inspectingVerification.verifiedAt)}
+            {/* Gate 4 */}
+            <div className="rounded-xl border border-border p-3.5 space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-foreground">Gate 4: Contradiction Check</span>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                  inspectingVerification.contradictionGate === "PASS"
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+                    : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
+                }`}>
+                  {inspectingVerification.contradictionGate} ({inspectingVerification.contradictionCount} open contradictions)
+                </span>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {inspectingVerification.contradictionCount === 0
+                  ? "No open pairwise conflicts detected with other accepted or verified claims."
+                  : "Has open conflict with other claim in project corpus."}
+              </p>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Inspect Detail Modal */}
+      {/* Detail Inspection Modal */}
       {selectedDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-xl border bg-card p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-base">Claim Inspection & Provenance</h3>
-              <button
-                onClick={() => setSelectedDetail(null)}
-                className="rounded p-1 hover:bg-muted text-muted-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
+        <Modal
+          isOpen={!!selectedDetail}
+          onClose={() => setSelectedDetail(null)}
+          title={`Claim Detail: ${selectedDetail.subjectEntity.canonicalName}.${selectedDetail.attributeKey}`}
+          description={`Extracted Fact ID: ${selectedDetail.id}`}
+          maxWidth="3xl"
+        >
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 text-xs">
+            {/* Meta */}
+            <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-border">
+              <div>
+                <p className="text-[11px] text-muted-foreground">Subject Entity</p>
+                <p className="font-semibold text-foreground mt-0.5">
+                  {selectedDetail.subjectEntity.canonicalName} ({selectedDetail.subjectEntity.type})
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Attribute & Category</p>
+                <p className="font-semibold text-foreground mt-0.5 font-mono">
+                  {selectedDetail.attributeKey} • {selectedDetail.category}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Raw Value</p>
+                <p className="font-semibold text-foreground mt-0.5">{selectedDetail.valueRaw}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Normalized Value</p>
+                <p className="font-semibold text-foreground mt-0.5 font-mono">
+                  {selectedDetail.valueNormalized || "(None)"}
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2 bg-muted/30 p-3 rounded-lg">
-                <div><strong>Claim ID:</strong> <span className="font-mono">{selectedDetail.id}</span></div>
-                <div><strong>Version:</strong> v{selectedDetail.version}</div>
-                <div><strong>Subject:</strong> {selectedDetail.subjectEntity.canonicalName} ({selectedDetail.subjectEntity.type})</div>
-                <div><strong>Attribute:</strong> {selectedDetail.attributeKey}</div>
-                <div><strong>Value Raw:</strong> {selectedDetail.valueRaw}</div>
-                <div><strong>Value Normalized:</strong> {selectedDetail.valueNormalized || "(none)"}</div>
-                <div><strong>Category:</strong> {selectedDetail.category}</div>
-                <div><strong>Review State:</strong> {selectedDetail.reviewState}</div>
-              </div>
-
-              {selectedDetail.extractionRun && (
-                <div className="rounded-lg border p-3 space-y-1">
-                  <div className="font-semibold text-foreground">Extraction Provenance</div>
-                  <div className="text-muted-foreground">Model: {selectedDetail.extractionRun.model}</div>
-                  <div className="text-muted-foreground">Prompt Version: {selectedDetail.extractionRun.promptVersion}</div>
-                  <div className="text-muted-foreground">Run ID: <span className="font-mono">{selectedDetail.extractionRun.id}</span></div>
-                </div>
-              )}
-
-              {selectedDetail.evidence.map((evItem) => (
-                <div key={evItem.id} className="rounded-lg border p-3 space-y-1 bg-muted/20">
-                  <div className="font-semibold text-foreground">Evidence Excerpt ({evItem.sourceLocation})</div>
-                  <blockquote className="italic border-l-2 border-primary/40 pl-2">
-                    &ldquo;{evItem.excerpt}&rdquo;
-                  </blockquote>
-                  <div className="text-muted-foreground pt-1">
-                    Document: {evItem.document.fileName} · Date basis: {evItem.document.sourceDateBasis}
+            {/* Evidence & Full Chunk */}
+            <div className="space-y-3">
+              <h4 className="font-semibold text-foreground">Source Citations & Underlying Chunks</h4>
+              {selectedDetail.evidence.map((ev) => (
+                <div key={ev.id} className="rounded-xl border border-border p-3.5 space-y-2 bg-card">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span className="font-semibold text-foreground">{ev.document.fileName}</span>
+                    <span className="font-mono">{ev.sourceLocation}</span>
                   </div>
+                  <blockquote className="border-l-2 border-primary pl-3 italic text-foreground py-0.5">
+                    &ldquo;{ev.excerpt}&rdquo;
+                  </blockquote>
+                  {ev.chunk && (
+                    <div className="mt-2 pt-2 border-t border-border/60">
+                      <p className="text-[11px] text-muted-foreground mb-1">
+                        Full Context (Chunk #{ev.chunk.chunkIndex + 1}):
+                      </p>
+                      <pre className="font-sans text-xs bg-slate-50 dark:bg-slate-900 p-2.5 rounded border border-border whitespace-pre-wrap max-h-36 overflow-y-auto">
+                        {ev.chunk.content}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+
+            {/* Extraction Run Meta */}
+            {selectedDetail.extractionRun && (
+              <div className="p-3 rounded-xl border border-border text-[11px] text-muted-foreground space-y-1">
+                <p className="font-semibold text-foreground">Extraction Run Information</p>
+                <p>Model: <span className="font-mono text-foreground">{selectedDetail.extractionRun.model}</span></p>
+                <p>Prompt Version: <span className="font-mono text-foreground">{selectedDetail.extractionRun.promptVersion}</span></p>
+                <p>Extracted At: {formatDateTime(selectedDetail.extractionRun.startedAt)}</p>
+              </div>
+            )}
           </div>
-        </div>
+        </Modal>
       )}
 
-      {/* Edit Modal */}
+      {/* Edit Claim Modal */}
       {editingClaim && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-xl border bg-card p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-base">Edit Claim (Creates New Version)</h3>
-              <button
-                onClick={() => setEditingClaim(null)}
-                className="rounded p-1 hover:bg-muted text-muted-foreground"
+        <Modal
+          isOpen={!!editingClaim}
+          onClose={() => setEditingClaim(null)}
+          title="Edit Claim"
+          description="Editing creates a new claim version and sets review status back to PENDING."
+        >
+          <form onSubmit={handleSaveEdit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1">Subject Entity</label>
+              <select
+                value={editSubjectId}
+                onChange={(e) => setEditSubjectId(e.target.value)}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
               >
-                <X className="h-4 w-4" />
-              </button>
+                {entities.map((en) => (
+                  <option key={en.id} value={en.id}>
+                    {en.canonicalName} ({en.type})
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
-              <div className="space-y-1.5">
-                <label className="font-semibold">Subject Entity</label>
-                <select
-                  value={editSubjectId}
-                  onChange={(e) => setEditSubjectId(e.target.value)}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-xs"
-                  required
-                >
-                  {entities.map((en) => (
-                    <option key={en.id} value={en.id}>
-                      {en.canonicalName} ({en.type})
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1">Attribute Key</label>
+              <input
+                type="text"
+                value={editAttributeKey}
+                onChange={(e) => setEditAttributeKey(e.target.value)}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                required
+              />
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="font-semibold">Attribute Key</label>
-                <select
-                  value={editAttributeKey}
-                  onChange={(e) => setEditAttributeKey(e.target.value)}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-xs"
-                  required
-                >
-                  {ATTRIBUTES.map((a) => (
-                    <option key={a} value={a}>{a}</option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1">Raw Value</label>
+              <textarea
+                value={editValueRaw}
+                onChange={(e) => setEditValueRaw(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                required
+              />
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="font-semibold">Value (Raw)</label>
-                <input
-                  type="text"
-                  value={editValueRaw}
-                  onChange={(e) => setEditValueRaw(e.target.value)}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-xs"
-                  required
-                />
-              </div>
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1">Category</label>
+              <select
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="font-semibold">Category</label>
-                <select
-                  value={editCategory}
-                  onChange={(e) => setEditCategory(e.target.value)}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-xs"
-                  required
-                >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t">
-                <button
-                  type="button"
-                  onClick={() => setEditingClaim(null)}
-                  className="rounded-md border px-4 py-2 hover:bg-muted font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingEdit}
-                  className="rounded-md bg-primary text-primary-foreground px-4 py-2 font-medium hover:bg-primary/90 disabled:opacity-50 inline-flex items-center gap-1.5"
-                >
-                  {savingEdit && <Loader2 className="h-3 w-3 animate-spin" />}
-                  Save New Version
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setEditingClaim(null)}
+                className="rounded-lg border border-border px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingEdit}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-colors disabled:opacity-40 cursor-pointer"
+              >
+                {savingEdit ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save New Version"
+                )}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

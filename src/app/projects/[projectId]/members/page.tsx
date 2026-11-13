@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react";
+import Link from "next/link";
 import { formatDate } from "@/lib/date";
-import { formatRoleLabel, getRoleBadgeClass } from "@/lib/roles";
+import { formatRoleLabel } from "@/lib/roles";
+import { PageHeader } from "@/components/ui/page-header";
+import { MetricCard } from "@/components/ui/metric-card";
+import { Badge } from "@/components/ui/badge";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   UserPlus,
   Shield,
@@ -11,6 +16,11 @@ import {
   AlertCircle,
   CheckCircle2,
   Info,
+  Users,
+  ShieldCheck,
+  UserCheck,
+  Eye,
+  X,
 } from "lucide-react";
 
 interface MemberItem {
@@ -152,11 +162,21 @@ export default function MembersPage({
     }
   }
 
-  if (loading) {
+  if (loading && !project) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center text-muted-foreground">
-        <Loader2 className="h-8 w-8 animate-spin mb-3 text-primary" />
-        <p className="text-sm font-medium">Loading project members...</p>
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumbs={
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Link href="/dashboard" className="hover:text-foreground">Projects</Link>
+              <span>/</span>
+              <span>Team & Access</span>
+            </div>
+          }
+          title="Team Members & Access Control"
+          description="Loading project roster..."
+        />
+        <TableSkeleton rows={4} />
       </div>
     );
   }
@@ -165,44 +185,97 @@ export default function MembersPage({
 
   const isOwner = project.currentUserRole === "OWNER";
   const ownerCount = project.members.filter((m) => m.role === "OWNER").length;
+  const reviewerCount = project.members.filter((m) => m.role === "REVIEWER").length;
+  const viewerCount = project.members.filter((m) => m.role === "VIEWER").length;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Team Members & Access Control</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Manage project membership, roles, and review authorizations.
-        </p>
-      </div>
+    <div className="space-y-8">
+      {/* Header */}
+      <PageHeader
+        breadcrumbs={
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Link href="/dashboard" className="hover:text-foreground">Projects</Link>
+            <span>/</span>
+            <Link href={`/projects/${projectId}`} className="hover:text-foreground">{project.name}</Link>
+            <span>/</span>
+            <span className="text-foreground font-medium">Team & Access</span>
+          </div>
+        }
+        title="Team Members & Access Control"
+        badge={
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            12-Permission RBAC
+          </span>
+        }
+        description="Manage project membership, assigned roles, and review authorizations across the workspace."
+      />
 
+      {/* Notifications */}
       {success && (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-800 dark:text-emerald-300">
-          <CheckCircle2 className="h-5 w-5 shrink-0" />
-          <span>{success}</span>
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/20 bg-emerald-50/50 p-4 text-xs font-medium text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <span>{success}</span>
+          </div>
+          <button onClick={() => setSuccess(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <span>{error}</span>
+        <div role="alert" className="flex items-center justify-between gap-2 rounded-lg border border-rose-500/20 bg-rose-50/50 p-4 text-xs font-medium text-rose-800 dark:bg-rose-950/20 dark:text-rose-300">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
       {!isOwner && (
-        <div className="flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-800 dark:text-blue-300">
-          <Info className="h-4 w-4 shrink-0" />
-          <span>You have {project.currentUserRole} access. Only project Owners can invite new members or change team roles.</span>
+        <div className="flex items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-50/50 p-3.5 text-xs text-blue-800 dark:bg-blue-950/20 dark:text-blue-300">
+          <Info className="h-4 w-4 shrink-0 text-blue-600" />
+          <span>You currently hold <strong>{formatRoleLabel(project.currentUserRole)}</strong> access. Only project Owners can invite new members or change team roles.</span>
         </div>
       )}
 
-      {/* Add Member Form (OWNER only) */}
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          title="Total Members"
+          value={project.members.length}
+          subtitle="Authorized users"
+          icon={Users}
+        />
+        <MetricCard
+          title="Project Owners"
+          value={ownerCount}
+          subtitle="Full administrative control"
+          icon={Shield}
+        />
+        <MetricCard
+          title="Reviewers"
+          value={reviewerCount}
+          subtitle="Evidence review & handover approval"
+          icon={UserCheck}
+        />
+        <MetricCard
+          title="Viewers"
+          value={viewerCount}
+          subtitle="Read-only & Q&A access"
+          icon={Eye}
+        />
+      </div>
+
+      {/* Invite Member Card (OWNER only) */}
       {isOwner && (
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <h3 className="font-semibold text-base mb-1">Invite Team Member</h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Add an existing registered user to this project workspace.
-          </p>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-4">
+          <div>
+            <h3 className="font-semibold text-sm text-foreground">Invite Team Member</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Add a registered colleague to this project workspace with designated role permissions.
+            </p>
+          </div>
 
           <form onSubmit={handleAddMember} className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
@@ -216,11 +289,11 @@ export default function MembersPage({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="colleague@example.com"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full rounded-lg border border-border bg-card px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
               />
             </div>
 
-            <div className="w-full sm:w-40">
+            <div className="w-full sm:w-44">
               <label htmlFor="memberRole" className="sr-only">
                 Project Role
               </label>
@@ -228,7 +301,7 @@ export default function MembersPage({
                 id="memberRole"
                 value={role}
                 onChange={(e) => setRole(e.target.value as "OWNER" | "REVIEWER" | "VIEWER")}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
               >
                 <option value="VIEWER">{formatRoleLabel("VIEWER")}</option>
                 <option value="REVIEWER">{formatRoleLabel("REVIEWER")}</option>
@@ -239,11 +312,11 @@ export default function MembersPage({
             <button
               type="submit"
               disabled={submitting || !email.trim()}
-              className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-all disabled:opacity-40 cursor-pointer"
             >
               {submitting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Adding...
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Adding...
                 </>
               ) : (
                 <>
@@ -256,34 +329,41 @@ export default function MembersPage({
       )}
 
       {/* Members Table */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b">
-          <h3 className="font-semibold text-base">Project Roster ({project.members.length})</h3>
+      <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+        <div className="px-5 py-3.5 border-b border-border bg-slate-50/75 dark:bg-slate-900/50 flex items-center justify-between">
+          <h3 className="font-semibold text-xs text-foreground">Project Roster ({project.members.length})</h3>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-muted/50 text-xs text-muted-foreground uppercase">
-              <tr>
-                <th className="px-6 py-3 font-semibold">User</th>
-                <th className="px-6 py-3 font-semibold">Role</th>
-                <th className="px-6 py-3 font-semibold">Joined Date</th>
-                {isOwner && <th className="px-6 py-3 font-semibold text-right">Actions</th>}
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-border text-[11px] font-semibold text-muted-foreground">
+                <th className="py-3 px-5 font-semibold">User</th>
+                <th className="py-3 px-4 font-semibold">Project Role</th>
+                <th className="py-3 px-4 font-semibold">Joined Date</th>
+                {isOwner && <th className="py-3 px-5 font-semibold text-right">Actions</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/60">
               {project.members.map((member) => {
                 const isMemberLastOwner = member.role === "OWNER" && ownerCount <= 1;
                 const isWorking = actionId === member.user.id;
 
                 return (
-                  <tr key={member.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-foreground">{member.user.name}</div>
-                      <div className="text-xs text-muted-foreground">{member.user.email}</div>
+                  <tr key={member.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/25 transition-colors">
+                    <td className="py-3.5 px-5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-muted-foreground flex items-center justify-center shrink-0 font-semibold text-xs">
+                          {member.user.name.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground text-xs">{member.user.name}</p>
+                          <p className="text-[11px] text-muted-foreground">{member.user.email}</p>
+                        </div>
+                      </div>
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="py-3.5 px-4">
                       {isOwner ? (
                         <div className="flex items-center gap-2">
                           <select
@@ -297,51 +377,37 @@ export default function MembersPage({
                                 ? "Cannot demote the last remaining owner of the project."
                                 : "Change member role"
                             }
-                            className="rounded border border-input bg-background px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                            className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 shadow-xs cursor-pointer"
                           >
-                            <option value="OWNER">{formatRoleLabel("OWNER")}</option>
-                            <option value="REVIEWER">{formatRoleLabel("REVIEWER")}</option>
                             <option value="VIEWER">{formatRoleLabel("VIEWER")}</option>
+                            <option value="REVIEWER">{formatRoleLabel("REVIEWER")}</option>
+                            <option value="OWNER">{formatRoleLabel("OWNER")}</option>
                           </select>
-                          {isMemberLastOwner && (
-                            <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                              (Sole Owner)
-                            </span>
-                          )}
                         </div>
                       ) : (
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getRoleBadgeClass(
-                            member.role
-                          )}`}
-                        >
+                        <Badge variant="neutral">
                           {formatRoleLabel(member.role)}
-                        </span>
+                        </Badge>
                       )}
                     </td>
 
-                    <td className="px-6 py-4 text-xs text-muted-foreground">
+                    <td className="py-3.5 px-4 text-muted-foreground font-medium text-xs">
                       {formatDate(member.joinedAt)}
                     </td>
 
                     {isOwner && (
-                      <td className="px-6 py-4 text-right">
+                      <td className="py-3.5 px-5 text-right">
                         <button
                           onClick={() => handleRemoveMember(member.user.id, member.user.name)}
                           disabled={isWorking || isMemberLastOwner}
                           title={
                             isMemberLastOwner
-                              ? "Cannot remove the last owner of the project."
+                              ? "Cannot remove the last remaining owner."
                               : "Remove member from project"
                           }
-                          className="inline-flex items-center gap-1 text-xs font-medium text-destructive hover:text-destructive/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="p-1.5 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
                         >
-                          {isWorking ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-3.5 w-3.5" />
-                          )}
-                          <span>Remove</span>
+                          <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </td>
                     )}
@@ -351,18 +417,6 @@ export default function MembersPage({
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Permissions Guide Info Box */}
-      <div className="rounded-xl border bg-muted/30 p-4 text-xs space-y-2">
-        <div className="font-semibold flex items-center gap-1.5 text-foreground">
-          <Shield className="h-3.5 w-3.5 text-primary" /> Role Permissions Guide
-        </div>
-        <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-          <li><strong>OWNER:</strong> Full access to manage project settings, team members, documents, verifications, and approvals.</li>
-          <li><strong>REVIEWER:</strong> Can upload documents, run extraction/verification, review claims, and approve handovers.</li>
-          <li><strong>VIEWER:</strong> Read-only access to approved handovers, cryptographic receipts, and grounded Q&amp;A.</li>
-        </ul>
       </div>
     </div>
   );

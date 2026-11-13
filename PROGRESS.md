@@ -15,6 +15,7 @@ Update at the end of every phase and every work session. Status comes from the r
 | 8 | Continuity Intelligence | Done | Yes | 2026-11-13 | Continuity Score, Bus Factor map, hardened Q&A refusal, 196 tests pass |
 | 9 | Security, Testing, UI Polish, Benchmark, Release | Done | Yes | 2026-11-13 | Security isolation, TEST held-out suite, benchmark 40 claims, v1.0.0 released |
 | - | Post-Release Small Fix Task (Items 1–7) | Done | Yes | 2026-11-13 | 7 small fixes applied across empty states, QA timeout, role display, entity zod, filters, dates, cleanup |
+| - | Enterprise Frontend Redesign | Done | Yes | 2026-11-13 | Complete UI/UX redesign into commercial-grade enterprise SaaS platform; 236 tests pass, build clean |
 
 Status values: Not started, In progress, Done (exit test passed), Blocked.
 
@@ -130,6 +131,85 @@ Status values: Not started, In progress, Done (exit test passed), Blocked.
 - `npm test`: Exit code 0 (220 tests passed across 27 test suites).
 - `npm run build`: Exit code 0 (all 51 routes compiled and statically optimized).
 - Live server verified: `http://localhost:3000` (database connected, latency healthy).
+
+---
+
+## Enterprise Frontend Redesign (Commercial-Grade SaaS UI/UX)
+
+### 1. What was built & delivered
+- **Original ContinuityX Design System & Tokens:**
+  - Modern, restrained enterprise palette: Background `#F8FAFC`, Surface `#FFFFFF`, Primary `#4F46E5`, Success `#16A34A`, Warning `#D97706`, Danger `#DC2626`, Neutral Border `#E2E8F0`, Text `#111827`, Secondary Text `#64748B`.
+  - Reusable component library in `src/components/ui/`: `badge.tsx`, `metric-card.tsx`, `empty-state.tsx`, `skeleton.tsx`, `modal.tsx`, `filter-pills.tsx`, `page-header.tsx`.
+- **Global App Shell & Navigation Hierarchy:**
+  - Persistent, collapsible sidebar (`sidebar.tsx`) with active project switcher, workspace overview link, grouped project navigation (Overview, Knowledge & Extraction, Verification & Quality, Continuity & Intelligence, Final Handover, Governance & Access), and user profile drawer.
+  - Contextual global topbar (`topbar.tsx`) with dynamic breadcrumb trail (`Workspace > Project > Section`), role pill, status indicator, mobile drawer trigger, and global Cmd+K search shortcut.
+  - Command palette (`search-modal.tsx`) enabling instant keyboard navigation across all project sections and recent actions.
+  - Mobile responsive drawer overlay and responsive layouts on all screens.
+- **Redesigned Workspace Dashboard (`src/app/dashboard/page.tsx`):**
+  - KPI overview metrics (Total Projects, Active Workspaces, Pending Reviews, Approved Handovers).
+  - Left column (2/3 width) project workspace cards with role badges, status dots, member counts, and review queue progress bars.
+  - Right column (1/3 width) "Action Required" panel highlighting pending reviews, and enterprise invariant safety highlights.
+  - Bottom section featuring recent sealed handovers with version badges and "Inspect Receipt" actions.
+  - Interactive "Create Project" modal without page refresh.
+- **Redesigned Project Overview Dashboard (`src/app/projects/[projectId]/page.tsx`):**
+  - Section A: Project Health metrics (Docs, Verified Claims ratio, Open Conflicts, Continuity Readiness).
+  - Section B: Knowledge Health progress bar and 4-gate verification distribution.
+  - Section C: R1–R6 diagnostic risk grid (Bus factor SPOF, missing docs, unassigned tasks, missing rationale, open questions, inconsistencies).
+  - Section D: Prioritized Action Required governance cards with direct routing.
+  - Section E: Recent indexed documents and claim activity log.
+- **Redesigned Knowledge & Extraction (`src/app/projects/[projectId]/documents/page.tsx`):**
+  - Linear-grade document table, metric cards, drag-and-drop file upload zone, status pills (`AI EXTRACTED`, `READY FOR AI`, pipeline stepper, validation failures), chunk counts, chunk inspection modal, search, filter pills (`ALL`, `READY`, `PROCESSING`, `WARNINGS`), retry, soft delete, and serverless auto-process poller.
+- **Redesigned Claims Evidence Workspace (`src/app/projects/[projectId]/claims/page.tsx`):**
+  - Master-detail evidence investigation workspace: Metric cards, status filter pills (`ALL`, `VERIFIED`, `WEAK_SUPPORT`, `CONFLICTING`, `UNVERIFIED`), category and attribute dropdowns, injection flag and normalization checkboxes.
+  - Proof-Carrying Verification Gates modal displaying detailed breakdown of Gate 1 (Source Existence), Gate 2 (Quote Match & similarity %), Gate 3 (Semantic Support & judge model), and Gate 4 (Contradiction Check & count).
+  - Claim detail inspection modal with chunk context and extraction run metadata. Edit claim modal with optimistic version increments.
+- **Redesigned Contradictions & Conflicts (`src/app/projects/[projectId]/conflicts/page.tsx`):**
+  - Side-by-side comparison interface: Metric cards (Total Contradictions, Open Conflicts, Possibly Superseded, Clarification Needed), status filter pills with exact counts.
+  - Chronology notice adhering to safe date rules (distinguishing dated discrepancy from unknown date basis).
+  - Side-by-side Claim A vs Claim B cards with document citation, excerpt, raw value, normalized value, and date basis.
+  - Conflict resolution modal with mandatory written rationale and action selection (`CHOOSE_A`, `CHOOSE_B`, `KEEP_BOTH`, `CONFIRM_SUPERSEDED`, `REQUIRES_CLARIFICATION`).
+  - Distinguishes unpopulated projects (`NO_CLAIMS_TITLE`) from zero conflicts checked.
+- **Redesigned Evidence Review Queue (`src/app/projects/[projectId]/review/page.tsx`):**
+  - Reviewer cockpit with progress ribbon (Position X of Y, pending, accepted, rejected, open conflicts count).
+  - Claim triple card with category and normalized value, 4-gate evidence proof summary, and highlighted source excerpt inside full surrounding chunk context.
+  - Keyboard navigation shortcuts (`[A] Accept`, `[R] Reject`, `[N] Next`, `[P] Prev`).
+  - Acceptance Rationale modal for non-VERIFIED claims and Rejection notes modal.
+  - Distinguishes unpopulated projects from complete review queue.
+- **Redesigned Handover & Cryptographic Receipt (`src/app/projects/[projectId]/handover/page.tsx`):**
+  - Version switcher between Draft Preview (Latest Accepted) and sealed approved snapshots.
+  - System Invariant Check alert in Draft mode blocking approval if conflicts or unreviewed claims remain.
+  - Cryptographic Approval Receipt card with canonical snapshot SHA-256 hash (one-click copy), previous receipt hash chain, approved by metadata, and tamper-evident clarification.
+  - 14 collapsible handover sections with item counts, empty notices, and evidence citations.
+  - "Approve Handover & Mint Receipt" modal and "Receipt Cryptographic Verification" modal running independent 2-way verification of snapshot integrity and live database claims.
+  - Deterministic PDF export.
+- **Redesigned Knowledge Loss Radar (`src/app/projects/[projectId]/radar/page.tsx`):**
+  - Visual risk intelligence interface with metric cards (Active Alerts, High Risk R1/R2/R6, Medium Risk R3/R4, Low Risk R5, Dismissed).
+  - Filter pills for Rule ID (R1–R6) and Status (Open, Dismissed, All).
+  - Alert cards with severity badge, diagnostic finding, associated claims, missing knowledge artifact/source document citation, and suggested remediation.
+  - Dismiss Alert modal with mandatory written justification and Reactivate action.
+  - Uses `getRadarEmptyState` for honest empty states.
+- **Redesigned Continuity Intelligence & Hardened Q&A (`src/app/projects/[projectId]/intelligence/page.tsx`):**
+  - Tab 1 (Continuity Score): Score gauge out of 100 or Insufficient Evidence badge, coverage % (>=60%), status badge, governance notice, and 5-metric breakdown grid with formulas.
+  - Tab 2 (Bus Factor Map): Single-contributor critical risk highlights (Bus factor = 1), verified owners list, module cards, and `getBusFactorEmptyState` integration.
+  - Tab 3 (Hardened Handover Q&A): Linear-grade chat interface, suggested questions, evidence citations, refusal state on unanswerable questions, and 30s timeout with retry button.
+- **Redesigned Entity Registry (`src/app/projects/[projectId]/entities/page.tsx`):**
+  - Entity registry with search and type filters (`COMPONENT`, `PERSON`, `SYSTEM`), needsReview toggle.
+  - Entity table with canonical names, normalized IDs, origin (`MODEL` vs `REVIEWER`), aliases pills, claim counts, and review state.
+  - Add Canonical Entity modal and Edit Entity modal with client-side zod validation (`entityNameSchema`, `entityAliasSchema`, `createEntitySchema`).
+  - Merge Entity modal with target dropdown and clean soft-merge execution.
+- **Redesigned Members & Access Control (`src/app/projects/[projectId]/members/page.tsx`):**
+  - Team membership table with `formatRoleLabel` role badges, joined dates, and owner actions.
+  - Invite Team Member card for owners with email input and role selector.
+  - Sole owner demotion and removal protection preserved.
+- **New Governance Audit Trail (`src/app/projects/[projectId]/audit/page.tsx` & `src/app/api/projects/[id]/audit/route.ts`):**
+  - Created governance audit trail timeline page with metric cards (Total Events, Handover Approvals, Conflict Resolutions, Review Actions), filter pills, search input, and chronological table with sanitized metadata JSON preview.
+
+### 2. Verification Summary
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm test`: Exit code 0 (236 tests passed across 29 test suites).
+- `npm run build`: Exit code 0 (all 51 routes compiled and statically optimized).
+
 ## Open questions
 
 (none yet)
@@ -753,4 +833,83 @@ The complete P0-A flow (auth, workspaces, document intelligence, AI claim extrac
 - `npm test`: Exit code 0 (220 tests passed across 27 test suites).
 - `npm run build`: Exit code 0 (all 51 routes compiled and statically optimized).
 - Live server verified: `http://localhost:3000` (database connected, latency healthy).
+
+---
+
+## Enterprise Frontend Redesign (Commercial-Grade SaaS UI/UX)
+
+### 1. What was built & delivered
+- **Original ContinuityX Design System & Tokens:**
+  - Modern, restrained enterprise palette: Background `#F8FAFC`, Surface `#FFFFFF`, Primary `#4F46E5`, Success `#16A34A`, Warning `#D97706`, Danger `#DC2626`, Neutral Border `#E2E8F0`, Text `#111827`, Secondary Text `#64748B`.
+  - Reusable component library in `src/components/ui/`: `badge.tsx`, `metric-card.tsx`, `empty-state.tsx`, `skeleton.tsx`, `modal.tsx`, `filter-pills.tsx`, `page-header.tsx`.
+- **Global App Shell & Navigation Hierarchy:**
+  - Persistent, collapsible sidebar (`sidebar.tsx`) with active project switcher, workspace overview link, grouped project navigation (Overview, Knowledge & Extraction, Verification & Quality, Continuity & Intelligence, Final Handover, Governance & Access), and user profile drawer.
+  - Contextual global topbar (`topbar.tsx`) with dynamic breadcrumb trail (`Workspace > Project > Section`), role pill, status indicator, mobile drawer trigger, and global Cmd+K search shortcut.
+  - Command palette (`search-modal.tsx`) enabling instant keyboard navigation across all project sections and recent actions.
+  - Mobile responsive drawer overlay and responsive layouts on all screens.
+- **Redesigned Workspace Dashboard (`src/app/dashboard/page.tsx`):**
+  - KPI overview metrics (Total Projects, Active Workspaces, Pending Reviews, Approved Handovers).
+  - Left column (2/3 width) project workspace cards with role badges, status dots, member counts, and review queue progress bars.
+  - Right column (1/3 width) "Action Required" panel highlighting pending reviews, and enterprise invariant safety highlights.
+  - Bottom section featuring recent sealed handovers with version badges and "Inspect Receipt" actions.
+  - Interactive "Create Project" modal without page refresh.
+- **Redesigned Project Overview Dashboard (`src/app/projects/[projectId]/page.tsx`):**
+  - Section A: Project Health metrics (Docs, Verified Claims ratio, Open Conflicts, Continuity Readiness).
+  - Section B: Knowledge Health progress bar and 4-gate verification distribution.
+  - Section C: R1–R6 diagnostic risk grid (Bus factor SPOF, missing docs, unassigned tasks, missing rationale, open questions, inconsistencies).
+  - Section D: Prioritized Action Required governance cards with direct routing.
+  - Section E: Recent indexed documents and claim activity log.
+- **Redesigned Knowledge & Extraction (`src/app/projects/[projectId]/documents/page.tsx`):**
+  - Linear-grade document table, metric cards, drag-and-drop file upload zone, status pills (`AI EXTRACTED`, `READY FOR AI`, pipeline stepper, validation failures), chunk counts, chunk inspection modal, search, filter pills (`ALL`, `READY`, `PROCESSING`, `WARNINGS`), retry, soft delete, and serverless auto-process poller.
+- **Redesigned Claims Evidence Workspace (`src/app/projects/[projectId]/claims/page.tsx`):**
+  - Master-detail evidence investigation workspace: Metric cards, status filter pills (`ALL`, `VERIFIED`, `WEAK_SUPPORT`, `CONFLICTING`, `UNVERIFIED`), category and attribute dropdowns, injection flag and normalization checkboxes.
+  - Proof-Carrying Verification Gates modal displaying detailed breakdown of Gate 1 (Source Existence), Gate 2 (Quote Match & similarity %), Gate 3 (Semantic Support & judge model), and Gate 4 (Contradiction Check & count).
+  - Claim detail inspection modal with chunk context and extraction run metadata. Edit claim modal with optimistic version increments.
+- **Redesigned Contradictions & Conflicts (`src/app/projects/[projectId]/conflicts/page.tsx`):**
+  - Side-by-side comparison interface: Metric cards (Total Contradictions, Open Conflicts, Possibly Superseded, Clarification Needed), status filter pills with exact counts.
+  - Chronology notice adhering to safe date rules (distinguishing dated discrepancy from unknown date basis).
+  - Side-by-side Claim A vs Claim B cards with document citation, excerpt, raw value, normalized value, and date basis.
+  - Conflict resolution modal with mandatory written rationale and action selection (`CHOOSE_A`, `CHOOSE_B`, `KEEP_BOTH`, `CONFIRM_SUPERSEDED`, `REQUIRES_CLARIFICATION`).
+  - Distinguishes unpopulated projects (`NO_CLAIMS_TITLE`) from zero conflicts checked.
+- **Redesigned Evidence Review Queue (`src/app/projects/[projectId]/review/page.tsx`):**
+  - Reviewer cockpit with progress ribbon (Position X of Y, pending, accepted, rejected, open conflicts count).
+  - Claim triple card with category and normalized value, 4-gate evidence proof summary, and highlighted source excerpt inside full surrounding chunk context.
+  - Keyboard navigation shortcuts (`[A] Accept`, `[R] Reject`, `[N] Next`, `[P] Prev`).
+  - Acceptance Rationale modal for non-VERIFIED claims and Rejection notes modal.
+  - Distinguishes unpopulated projects from complete review queue.
+- **Redesigned Handover & Cryptographic Receipt (`src/app/projects/[projectId]/handover/page.tsx`):**
+  - Version switcher between Draft Preview (Latest Accepted) and sealed approved snapshots.
+  - System Invariant Check alert in Draft mode blocking approval if conflicts or unreviewed claims remain.
+  - Cryptographic Approval Receipt card with canonical snapshot SHA-256 hash (one-click copy), previous receipt hash chain, approved by metadata, and tamper-evident clarification.
+  - 14 collapsible handover sections with item counts, empty notices, and evidence citations.
+  - "Approve Handover & Mint Receipt" modal and "Receipt Cryptographic Verification" modal running independent 2-way verification of snapshot integrity and live database claims.
+  - Deterministic PDF export.
+- **Redesigned Knowledge Loss Radar (`src/app/projects/[projectId]/radar/page.tsx`):**
+  - Visual risk intelligence interface with metric cards (Active Alerts, High Risk R1/R2/R6, Medium Risk R3/R4, Low Risk R5, Dismissed).
+  - Filter pills for Rule ID (R1–R6) and Status (Open, Dismissed, All).
+  - Alert cards with severity badge, diagnostic finding, associated claims, missing knowledge artifact/source document citation, and suggested remediation.
+  - Dismiss Alert modal with mandatory written justification and Reactivate action.
+  - Uses `getRadarEmptyState` for honest empty states.
+- **Redesigned Continuity Intelligence & Hardened Q&A (`src/app/projects/[projectId]/intelligence/page.tsx`):**
+  - Tab 1 (Continuity Score): Score gauge out of 100 or Insufficient Evidence badge, coverage % (>=60%), status badge, governance notice, and 5-metric breakdown grid with formulas.
+  - Tab 2 (Bus Factor Map): Single-contributor critical risk highlights (Bus factor = 1), verified owners list, module cards, and `getBusFactorEmptyState` integration.
+  - Tab 3 (Hardened Handover Q&A): Linear-grade chat interface, suggested questions, evidence citations, refusal state on unanswerable questions, and 30s timeout with retry button.
+- **Redesigned Entity Registry (`src/app/projects/[projectId]/entities/page.tsx`):**
+  - Entity registry with search and type filters (`COMPONENT`, `PERSON`, `SYSTEM`), needsReview toggle.
+  - Entity table with canonical names, normalized IDs, origin (`MODEL` vs `REVIEWER`), aliases pills, claim counts, and review state.
+  - Add Canonical Entity modal and Edit Entity modal with client-side zod validation (`entityNameSchema`, `entityAliasSchema`, `createEntitySchema`).
+  - Merge Entity modal with target dropdown and clean soft-merge execution.
+- **Redesigned Members & Access Control (`src/app/projects/[projectId]/members/page.tsx`):**
+  - Team membership table with `formatRoleLabel` role badges, joined dates, and owner actions.
+  - Invite Team Member card for owners with email input and role selector.
+  - Sole owner demotion and removal protection preserved.
+- **New Governance Audit Trail (`src/app/projects/[projectId]/audit/page.tsx` & `src/app/api/projects/[id]/audit/route.ts`):**
+  - Created governance audit trail timeline page with metric cards (Total Events, Handover Approvals, Conflict Resolutions, Review Actions), filter pills, search input, and chronological table with sanitized metadata JSON preview.
+
+### 2. Verification Summary
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm test`: Exit code 0 (236 tests passed across 29 test suites).
+- `npm run build`: Exit code 0 (all 51 routes compiled and statically optimized).
+
 

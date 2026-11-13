@@ -3,6 +3,12 @@
 import React, { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/date";
+import { getReviewQueueEmptyState } from "@/lib/empty-states";
+import { PageHeader } from "@/components/ui/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   AlertCircle,
   AlertTriangle,
@@ -10,13 +16,15 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  FileQuestion,
   FileText,
   HelpCircle,
   Keyboard,
   Loader2,
   RotateCw,
   X,
+  ShieldCheck,
+  Check,
+  Ban,
 } from "lucide-react";
 
 interface QueueItem {
@@ -184,7 +192,7 @@ export default function ReviewSplitPanePage({
   const handleAcceptClick = useCallback(() => {
     if (!currentClaim) return;
     if (currentClaim.hasOpenConflict) {
-      setError("Cannot accept: this claim is in an OPEN conflict. Resolve the conflict first.");
+      setError("Cannot accept: this claim is in an OPEN conflict. Resolve the conflict first in the Conflicts tab.");
       return;
     }
 
@@ -206,7 +214,6 @@ export default function ReviewSplitPanePage({
   // Keyboard navigation shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Don't fire shortcuts when typing in inputs/textareas
       const target = e.target as HTMLElement;
       if (
         target.tagName === "INPUT" ||
@@ -239,128 +246,66 @@ export default function ReviewSplitPanePage({
   function renderStatusBadge(status?: string) {
     switch (status) {
       case "VERIFIED":
-        return (
-          <span className="inline-flex items-center gap-1 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-            VERIFIED
-          </span>
-        );
+        return <Badge variant="verified">VERIFIED</Badge>;
       case "WEAK_SUPPORT":
-        return (
-          <span className="inline-flex items-center gap-1 rounded bg-blue-100 text-blue-800 dark:bg-blue-950/40 dark:text-blue-300 px-2 py-0.5 text-xs font-semibold">
-            <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
-            WEAK SUPPORT
-          </span>
-        );
+        return <Badge variant="weak">WEAK SUPPORT</Badge>;
       case "CONFLICTING":
-        return (
-          <span className="inline-flex items-center gap-1 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 px-2 py-0.5 text-xs font-semibold">
-            <AlertCircle className="h-3.5 w-3.5 text-rose-600" />
-            CONFLICTING
-          </span>
-        );
+        return <Badge variant="contradicted">CONFLICTING</Badge>;
       case "UNVERIFIED":
-        return (
-          <span className="inline-flex items-center gap-1 rounded bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 text-xs font-semibold">
-            <FileQuestion className="h-3.5 w-3.5 text-slate-500" />
-            UNVERIFIED
-          </span>
-        );
+        return <Badge variant="unverified">UNVERIFIED</Badge>;
       case "UNKNOWN":
       default:
-        return (
-          <span className="inline-flex items-center gap-1 rounded bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 px-2 py-0.5 text-xs font-semibold">
-            <HelpCircle className="h-3.5 w-3.5 text-purple-600" />
-            UNKNOWN
-          </span>
-        );
+        return <Badge variant="neutral">UNKNOWN</Badge>;
     }
   }
 
-  return (
-    <div className="space-y-4">
-      {/* Top Bar with Queue Progress & Shortcuts Guide */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Split-Pane Evidence Review</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Evaluate candidate claims directly alongside cited document excerpts with keyboard shortcuts.
-          </p>
-        </div>
+  const emptyInfo = getReviewQueueEmptyState(
+    queueData?.metrics.totalClaims ?? 0,
+    queueData?.queue.length ?? 0
+  );
 
-        {queueData && (
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <PageHeader
+        breadcrumbs={
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Link href="/dashboard" className="hover:text-foreground">Projects</Link>
+            <span>/</span>
+            <Link href={`/projects/${projectId}`} className="hover:text-foreground">Project</Link>
+            <span>/</span>
+            <span className="text-foreground font-medium">Evidence Review</span>
+          </div>
+        }
+        title="Evidence Review Queue"
+        description="Inspect candidate claims directly alongside cited document excerpts with keyboard shortcuts."
+        actions={
           <div className="flex items-center gap-3">
-            {/* Keyboard shortcut badges */}
-            <div className="hidden lg:flex items-center gap-1.5 text-[11px] bg-muted/50 border rounded-lg px-2.5 py-1 text-muted-foreground">
-              <Keyboard className="h-3.5 w-3.5 text-primary" />
-              <span>Shortcuts:</span>
-              <kbd className="bg-background border rounded px-1 font-mono">A</kbd> Accept
-              <kbd className="bg-background border rounded px-1 font-mono ml-1">R</kbd> Reject
-              <kbd className="bg-background border rounded px-1 font-mono ml-1">N</kbd> Next
+            <div className="hidden lg:flex items-center gap-1.5 text-xs bg-slate-100 dark:bg-slate-800/80 border border-border rounded-lg px-3 py-1.5 text-muted-foreground">
+              <Keyboard className="h-3.5 w-3.5 text-primary mr-0.5" />
+              <span>Keys:</span>
+              <kbd className="bg-card border border-border rounded px-1.5 py-0.5 font-mono text-[11px] text-foreground font-semibold">A</kbd> Accept
+              <kbd className="bg-card border border-border rounded px-1.5 py-0.5 font-mono text-[11px] text-foreground font-semibold ml-1">R</kbd> Reject
+              <kbd className="bg-card border border-border rounded px-1.5 py-0.5 font-mono text-[11px] text-foreground font-semibold ml-1">N</kbd> Next
             </div>
 
             <button
               onClick={loadQueue}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
             >
               <RotateCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </button>
           </div>
-        )}
-      </div>
+        }
+      />
 
-      {/* Progress & Queue Counter */}
-      {queueData && (
-        <div className="rounded-xl border bg-card p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-4">
-            <span className="font-semibold text-foreground">
-              Queue Position: {queueData.queue.length > 0 ? currentIndex + 1 : 0} of {queueData.queue.length}
-            </span>
-            <span className="text-muted-foreground">
-              · {queueData.metrics.pendingCount} Pending
-            </span>
-            <span className="text-emerald-700 dark:text-emerald-400">
-              · {queueData.metrics.acceptedCount} Accepted
-            </span>
-            <span className="text-rose-700 dark:text-rose-400">
-              · {queueData.metrics.rejectedCount} Rejected
-            </span>
-            {queueData.metrics.openConflictsCount > 0 && (
-              <span className="text-rose-600 font-semibold flex items-center gap-1">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {queueData.metrics.openConflictsCount} Open Conflicts
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrev}
-              disabled={queueData.queue.length <= 1}
-              className="rounded border p-1 hover:bg-muted disabled:opacity-40"
-              title="Previous claim (P)"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={handleNext}
-              disabled={queueData.queue.length <= 1}
-              className="rounded border p-1 hover:bg-muted disabled:opacity-40"
-              title="Next claim (N)"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Error / Success Notifications */}
+      {/* Notifications */}
       {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-center justify-between">
+        <div role="alert" className="flex items-center justify-between gap-2 rounded-lg border border-rose-500/20 bg-rose-50/50 p-4 text-xs font-medium text-rose-800 dark:bg-rose-950/20 dark:text-rose-300">
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
           <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
@@ -368,7 +313,7 @@ export default function ReviewSplitPanePage({
       )}
 
       {success && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/20 bg-emerald-50/50 p-4 text-xs font-medium text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
             <span>{success}</span>
@@ -377,48 +322,89 @@ export default function ReviewSplitPanePage({
         </div>
       )}
 
-      {/* Split-Pane Body */}
+      {/* Metrics & Queue Position Ribbon */}
+      {queueData && (
+        <div className="rounded-xl border border-border bg-card p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-semibold text-foreground flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              Queue Position: <strong className="text-primary">{queueData.queue.length > 0 ? currentIndex + 1 : 0}</strong> of {queueData.queue.length}
+            </span>
+            <span className="text-muted-foreground">•</span>
+            <span className="text-muted-foreground">
+              {queueData.metrics.pendingCount} Pending Review
+            </span>
+            <span className="text-muted-foreground">•</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+              {queueData.metrics.acceptedCount} Accepted
+            </span>
+            <span className="text-muted-foreground">•</span>
+            <span className="text-rose-700 dark:text-rose-400 font-medium">
+              {queueData.metrics.rejectedCount} Rejected
+            </span>
+            {queueData.metrics.openConflictsCount > 0 && (
+              <span className="text-rose-600 font-semibold flex items-center gap-1 bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded-md border border-rose-200">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {queueData.metrics.openConflictsCount} Open Conflicts
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handlePrev}
+              disabled={queueData.queue.length <= 1}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              title="Previous claim (P)"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" /> Prev (P)
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={queueData.queue.length <= 1}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              title="Next claim (N)"
+            >
+              Next (N) <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Review Workspace */}
       {loading ? (
-        <div className="rounded-xl border bg-card p-16 text-center text-muted-foreground">
-          <Loader2 className="h-8 w-8 mx-auto animate-spin mb-3 text-primary" />
-          <p className="text-sm">Loading review candidate queue...</p>
-        </div>
-      ) : queueData?.metrics.totalClaims === 0 ? (
-        <div className="rounded-xl border bg-card p-16 text-center text-muted-foreground">
-          <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-          <h3 className="font-bold text-foreground text-lg">No claims yet. Upload documents and run extraction first</h3>
-          <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1 mb-4">
-            Upload project documentation and run automated claim extraction to populate the evidence review queue.
-          </p>
-          <Link
-            href={`/projects/${projectId}/documents`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            Go to Documents
-          </Link>
-        </div>
-      ) : !currentClaim ? (
-        <div className="rounded-xl border bg-card p-16 text-center text-muted-foreground">
-          <CheckCircle2 className="h-12 w-12 mx-auto text-emerald-500 mb-3" />
-          <h3 className="font-bold text-foreground text-lg">Review Queue Complete!</h3>
-          <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">
-            All extracted candidate claims in this project have been reviewed or resolved. You are ready to inspect conflicts or generate the handover snapshot.
-          </p>
-        </div>
+        <TableSkeleton rows={5} />
+      ) : emptyInfo.state === "NO_DATA" ? (
+        <EmptyState
+          type="no-data"
+          title={emptyInfo.title}
+          description={emptyInfo.description}
+          actionHref={`/projects/${projectId}/documents`}
+          actionLabel={emptyInfo.linkLabel || "Go to Documents"}
+        />
+      ) : emptyInfo.state === "CHECKED_EMPTY" || !currentClaim ? (
+        <EmptyState
+          type="completed"
+          title={emptyInfo.title || "Review Queue Complete!"}
+          description={
+            emptyInfo.description ||
+            "All extracted candidate claims in this project have been reviewed or resolved. You are ready to inspect conflicts or generate the handover snapshot."
+          }
+          actionHref={`/projects/${projectId}/handover`}
+          actionLabel="Go to Handover Workspace"
+        />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Pane: Claim Details, Gates & Actions (5 cols) */}
           <div className="lg:col-span-5 space-y-4">
-            <div className="rounded-xl border bg-card p-5 space-y-4 shadow-sm">
-              <div className="flex items-center justify-between border-b pb-3">
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between border-b border-border/80 pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs text-muted-foreground">
-                    ID: {currentClaim.id.slice(0, 8)}... (v{currentClaim.version})
+                  <span className="font-mono text-xs text-muted-foreground font-semibold">
+                    Fact #{currentClaim.id.slice(0, 8)} (v{currentClaim.version})
                   </span>
                   {currentClaim.injectionFlag && (
-                    <span className="rounded bg-rose-100 text-rose-800 px-1.5 py-0.5 text-[10px] font-bold">
-                      INJECTION FLAGGED
-                    </span>
+                    <Badge variant="destructive">INJECTION FLAGGED</Badge>
                   )}
                 </div>
                 {renderStatusBadge(currentClaim.latestVerification?.status)}
@@ -426,44 +412,57 @@ export default function ReviewSplitPanePage({
 
               {/* Conflict warning if present */}
               {currentClaim.hasOpenConflict && (
-                <div className="rounded-lg border border-rose-300 bg-rose-50 dark:bg-rose-950/20 p-3 text-xs text-rose-900 dark:text-rose-200 flex items-start gap-2">
+                <div className="rounded-lg border border-rose-500/20 bg-rose-50/60 dark:bg-rose-950/20 p-3 text-xs text-rose-900 dark:text-rose-200 flex items-start gap-2.5">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
                   <div>
-                    <strong>Unresolved Conflict:</strong> This claim is involved in an active OPEN conflict. Per SPEC.md, it cannot be accepted until resolved in the Conflicts tab.
+                    <p className="font-semibold">Unresolved Conflict Blocker</p>
+                    <p className="text-[11px] text-rose-800 dark:text-rose-300 mt-0.5 leading-relaxed">
+                      This claim is involved in an active OPEN conflict. Per SPEC.md invariants, it cannot be accepted into the handover snapshot until resolved in the Conflicts workspace.
+                    </p>
                   </div>
                 </div>
               )}
 
               {/* Claim Triple */}
-              <div className="space-y-3 bg-muted/30 p-3.5 rounded-lg text-xs">
+              <div className="space-y-3 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-border text-xs">
                 <div>
-                  <span className="text-muted-foreground font-medium block">Subject Entity:</span>
-                  <span className="font-bold text-sm text-foreground">
-                    {currentClaim.subjectEntity.canonicalName}
+                  <span className="text-[11px] text-muted-foreground font-semibold block uppercase tracking-wider">
+                    Subject Entity:
                   </span>
-                  <span className="ml-2 font-mono text-[11px] text-muted-foreground">
-                    ({currentClaim.subjectEntity.type})
-                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="font-bold text-base text-foreground">
+                      {currentClaim.subjectEntity.canonicalName}
+                    </span>
+                    <span className="font-mono text-[11px] text-muted-foreground bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                      {currentClaim.subjectEntity.type}
+                    </span>
+                  </div>
                 </div>
 
                 <div>
-                  <span className="text-muted-foreground font-medium block">Attribute:</span>
-                  <span className="font-mono text-foreground font-semibold">
-                    {currentClaim.attributeKey}
+                  <span className="text-[11px] text-muted-foreground font-semibold block uppercase tracking-wider">
+                    Attribute & Dimension:
                   </span>
-                  <span className="ml-2 text-muted-foreground font-mono text-[11px]">
-                    [{currentClaim.category}]
-                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="font-mono text-foreground font-bold text-sm">
+                      .{currentClaim.attributeKey}
+                    </span>
+                    <span className="rounded-md bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-semibold">
+                      {currentClaim.category}
+                    </span>
+                  </div>
                 </div>
 
                 <div>
-                  <span className="text-muted-foreground font-medium block">Claim Value:</span>
-                  <div className="font-semibold text-sm text-foreground bg-background p-2 rounded border mt-0.5">
+                  <span className="text-[11px] text-muted-foreground font-semibold block uppercase tracking-wider">
+                    Extracted Value:
+                  </span>
+                  <div className="font-semibold text-sm text-foreground bg-card p-2.5 rounded-lg border border-border mt-1 shadow-xs">
                     {currentClaim.valueRaw}
                   </div>
                   {currentClaim.valueNormalized && (
-                    <div className="text-[11px] text-muted-foreground mt-1">
-                      Normalized: <span className="font-mono">{currentClaim.valueNormalized}</span>
+                    <div className="text-[11px] text-muted-foreground mt-1.5">
+                      Normalized canonical form: <span className="font-mono text-foreground font-semibold">{currentClaim.valueNormalized}</span>
                     </div>
                   )}
                 </div>
@@ -471,46 +470,49 @@ export default function ReviewSplitPanePage({
 
               {/* Verification Gates Summary */}
               {currentClaim.latestVerification && (
-                <div className="space-y-2 border rounded-lg p-3 text-xs bg-card">
+                <div className="space-y-2.5 border border-border rounded-xl p-3.5 text-xs bg-card">
                   <div className="font-semibold text-foreground flex items-center justify-between">
-                    <span>4-Gate Proof Breakdown</span>
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-primary" />
+                      4-Gate Evidence Proof
+                    </span>
                     <span className="text-[11px] font-mono text-muted-foreground">
                       {currentClaim.latestVerification.ruleSetVersion}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-[11px]">
-                    <div className="flex items-center justify-between bg-muted/40 p-1.5 rounded">
-                      <span>Gate 1 (Source):</span>
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/60 p-2 rounded-lg border border-border/60">
+                      <span className="text-muted-foreground">Gate 1 (Source):</span>
                       <span className={`font-bold ${currentClaim.latestVerification.sourceGate === "PASS" ? "text-emerald-600" : "text-rose-600"}`}>
                         {currentClaim.latestVerification.sourceGate}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between bg-muted/40 p-1.5 rounded">
-                      <span>Gate 2 (Quote):</span>
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/60 p-2 rounded-lg border border-border/60">
+                      <span className="text-muted-foreground">Gate 2 (Quote):</span>
                       <span className={`font-bold ${currentClaim.latestVerification.quoteGate === "PASS" ? "text-emerald-600" : "text-rose-600"}`}>
                         {currentClaim.latestVerification.quoteGate} {currentClaim.latestVerification.quoteSimilarity !== null ? `(${Math.round(currentClaim.latestVerification.quoteSimilarity * 100)}%)` : ""}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between bg-muted/40 p-1.5 rounded">
-                      <span>Gate 3 (Judge):</span>
-                      <span className="font-mono font-semibold">
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/60 p-2 rounded-lg border border-border/60">
+                      <span className="text-muted-foreground">Gate 3 (Judge):</span>
+                      <span className="font-mono font-semibold text-foreground">
                         {currentClaim.latestVerification.semanticGate || "SKIPPED"}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between bg-muted/40 p-1.5 rounded">
-                      <span>Gate 4 (Conflict):</span>
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/60 p-2 rounded-lg border border-border/60">
+                      <span className="text-muted-foreground">Gate 4 (Conflict):</span>
                       <span className={`font-bold ${currentClaim.latestVerification.contradictionGate === "PASS" ? "text-emerald-600" : "text-rose-600"}`}>
-                        {currentClaim.latestVerification.contradictionGate === "PASS" ? "NO CONFLICT" : "CONFLICT"}
+                        {currentClaim.latestVerification.contradictionGate === "PASS" ? "PASS" : "FAIL"}
                       </span>
                     </div>
                   </div>
 
                   {currentClaim.latestVerification.semanticReason && (
-                    <p className="text-[11px] text-muted-foreground italic border-t pt-1.5">
+                    <p className="text-[11px] text-muted-foreground italic border-t border-border/60 pt-2 leading-relaxed">
                       Judge Reason: &ldquo;{currentClaim.latestVerification.semanticReason}&rdquo;
                     </p>
                   )}
@@ -518,32 +520,32 @@ export default function ReviewSplitPanePage({
               )}
 
               {/* Review Action Buttons */}
-              <div className="pt-2 flex flex-wrap gap-2">
+              <div className="pt-2 flex flex-col sm:flex-row gap-2">
                 <button
                   onClick={handleAcceptClick}
                   disabled={submittingAction || currentClaim.hasOpenConflict}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-semibold shadow disabled:opacity-50"
-                  title="Accept claim (Shortcut: A)"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
+                  title="Accept claim into handover (Shortcut: A)"
                 >
-                  <CheckCircle2 className="h-4 w-4" />
+                  <Check className="h-4 w-4" />
                   Accept (A)
                 </button>
 
                 <button
                   onClick={handleRejectClick}
                   disabled={submittingAction}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 text-xs font-semibold shadow disabled:opacity-50"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
                   title="Reject claim (Shortcut: R)"
                 >
-                  <X className="h-4 w-4" />
+                  <Ban className="h-4 w-4" />
                   Reject (R)
                 </button>
 
                 <button
                   onClick={() => submitDecision("NEEDS_CLARIFICATION", { comments: "Clarification requested from project owner" })}
                   disabled={submittingAction}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-2 text-xs font-medium hover:bg-muted"
-                  title="Request clarification"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-accent transition-colors shadow-xs cursor-pointer"
+                  title="Request clarification from project owner"
                 >
                   <HelpCircle className="h-4 w-4 text-purple-600" />
                   Clarify
@@ -551,7 +553,7 @@ export default function ReviewSplitPanePage({
 
                 <button
                   onClick={handleNext}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-md border bg-background px-3 py-2 text-xs font-medium hover:bg-muted"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-accent transition-colors shadow-xs cursor-pointer"
                   title="Next claim (Shortcut: N)"
                 >
                   <ArrowRight className="h-4 w-4" />
@@ -563,8 +565,8 @@ export default function ReviewSplitPanePage({
 
           {/* Right Pane: Source Document & Highlighted Excerpt (7 cols) */}
           <div className="lg:col-span-7 space-y-4">
-            <div className="rounded-xl border bg-card p-5 space-y-4 shadow-sm min-h-[500px]">
-              <div className="flex items-center justify-between border-b pb-3">
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-xs min-h-[500px]">
+              <div className="flex items-center justify-between border-b border-border/80 pb-3">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-primary" />
                   <span className="font-bold text-sm text-foreground">
@@ -572,7 +574,7 @@ export default function ReviewSplitPanePage({
                   </span>
                 </div>
                 {currentClaim.evidence[0] && (
-                  <span className="text-xs text-muted-foreground font-mono">
+                  <span className="text-xs text-muted-foreground font-mono bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
                     {currentClaim.evidence[0].sourceLocation}
                   </span>
                 )}
@@ -580,14 +582,13 @@ export default function ReviewSplitPanePage({
 
               {currentClaim.evidence.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground text-xs">
-                  No evidence reference linked to this claim.
+                  No evidence reference linked to this candidate claim.
                 </div>
               ) : (
                 currentClaim.evidence.map((ev, idx) => {
                   const chunkText = ev.chunk?.content || "";
                   const excerpt = ev.excerpt.trim();
 
-                  // Highlight excerpt inside chunk text if available
                   let preText = chunkText;
                   let matchText = "";
                   let postText = "";
@@ -602,38 +603,38 @@ export default function ReviewSplitPanePage({
                   return (
                     <div key={ev.id || idx} className="space-y-4 text-xs">
                       {/* Document Metadata Bar */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/40 p-2.5 rounded-lg text-[11px] text-muted-foreground">
+                      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-border text-[11px] text-muted-foreground">
                         <div>
-                          <strong>File:</strong> {ev.document.fileName}
+                          <strong className="text-foreground">File:</strong> {ev.document.fileName}
                         </div>
                         <div>
-                          <strong>Source Date:</strong> {ev.document.sourceDate ? formatDate(ev.document.sourceDate) : "(none)"} (basis: {ev.document.sourceDateBasis})
+                          <strong className="text-foreground">Source Date:</strong> {ev.document.sourceDate ? formatDate(ev.document.sourceDate) : "(none)"} (basis: <span className="font-mono">{ev.document.sourceDateBasis}</span>)
                         </div>
                         <div>
-                          <strong>Location:</strong> {ev.sourceLocation}
+                          <strong className="text-foreground">Location:</strong> {ev.sourceLocation}
                         </div>
                       </div>
 
                       {/* Cited Excerpt Highlight Box */}
-                      <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-3.5 space-y-1.5">
+                      <div className="rounded-xl border-2 border-primary/40 bg-primary/5 p-4 space-y-1.5 shadow-xs">
                         <span className="font-semibold text-primary text-[11px] uppercase tracking-wider block">
                           Cited Verbatim Excerpt:
                         </span>
-                        <blockquote className="text-foreground text-sm font-medium italic">
+                        <blockquote className="text-foreground text-sm font-medium italic leading-relaxed">
                           &ldquo;{ev.excerpt}&rdquo;
                         </blockquote>
                       </div>
 
                       {/* Full Surrounding Chunk Context */}
-                      <div className="space-y-1.5 pt-2">
+                      <div className="space-y-2 pt-2">
                         <span className="font-semibold text-muted-foreground text-[11px] uppercase tracking-wider block">
                           Full Chunk Text Context:
                         </span>
-                        <div className="rounded-lg border bg-muted/20 p-4 font-serif text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-96 overflow-y-auto">
+                        <div className="rounded-xl border border-border bg-slate-50/50 dark:bg-slate-900/30 p-4 font-serif text-sm leading-relaxed whitespace-pre-wrap text-foreground max-h-96 overflow-y-auto">
                           {matchText ? (
                             <>
                               <span>{preText}</span>
-                              <mark className="bg-amber-200 dark:bg-amber-900/50 text-foreground px-1 py-0.5 rounded font-medium">
+                              <mark className="bg-amber-200 dark:bg-amber-900/60 text-foreground px-1 py-0.5 rounded font-medium">
                                 {matchText}
                               </mark>
                               <span>{postText}</span>
@@ -654,41 +655,34 @@ export default function ReviewSplitPanePage({
 
       {/* Accept Non-VERIFIED Reason Modal */}
       {acceptReasonModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-base">Acceptance Reason Required</h3>
-              <button
-                onClick={() => setAcceptReasonModalOpen(false)}
-                className="rounded p-1 hover:bg-muted text-muted-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+        <Modal
+          isOpen={acceptReasonModalOpen}
+          onClose={() => setAcceptReasonModalOpen(false)}
+          title="Acceptance Rationale Required"
+          description="Per SPEC.md rules, accepting any claim without strict VERIFIED status requires an explicit recorded reason."
+        >
+          <div className="space-y-4 text-xs">
+            <p className="text-muted-foreground">
+              This claim currently holds evidence status <strong className="text-foreground">{currentClaim?.latestVerification?.status || "UNVERIFIED"}</strong>. Provide the rationale for overriding verification.
+            </p>
 
-            <div className="text-xs text-muted-foreground space-y-2">
-              <p>
-                This claim has evidence status <strong>{currentClaim?.latestVerification?.status || "UNVERIFIED"}</strong>. Per SPEC.md V3.2 rules, accepting any non-VERIFIED claim into the handover requires an explicit written reason.
-              </p>
-            </div>
-
-            <div className="space-y-1.5 text-xs">
-              <label className="font-semibold">Reviewer Reason / Justification</label>
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Reviewer Justification</label>
               <textarea
                 rows={3}
                 required
                 value={acceptReasonText}
                 onChange={(e) => setAcceptReasonText(e.target.value)}
-                placeholder="State why this claim is accepted despite weak/unverified status (e.g. verified out-of-band with lead)..."
-                className="w-full rounded-md border bg-background px-3 py-2 text-xs"
+                placeholder="State why this claim is accepted despite weak/unverified status (e.g., confirmed out-of-band with engineering lead)..."
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t text-xs">
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setAcceptReasonModalOpen(false)}
-                className="rounded-md border px-4 py-2 hover:bg-muted font-medium"
+                className="rounded-lg border border-border px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -696,46 +690,41 @@ export default function ReviewSplitPanePage({
                 type="button"
                 disabled={submittingAction || !acceptReasonText.trim()}
                 onClick={() => submitDecision("ACCEPTED", { reason: acceptReasonText.trim() })}
-                className="rounded-md bg-emerald-600 text-white px-4 py-2 font-medium hover:bg-emerald-700 disabled:opacity-50 inline-flex items-center gap-1.5"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 text-white px-4 py-1.5 text-xs font-semibold shadow-xs hover:bg-emerald-700 transition-colors disabled:opacity-40 cursor-pointer"
               >
-                {submittingAction && <Loader2 className="h-3 w-3 animate-spin" />}
+                {submittingAction && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Confirm Acceptance
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Reject Modal */}
       {rejectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-bold text-base">Reject Claim</h3>
-              <button
-                onClick={() => setRejectModalOpen(false)}
-                className="rounded p-1 hover:bg-muted text-muted-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="space-y-1.5 text-xs">
-              <label className="font-semibold">Rejection Notes / Comments</label>
+        <Modal
+          isOpen={rejectModalOpen}
+          onClose={() => setRejectModalOpen(false)}
+          title="Reject Candidate Claim"
+          description="Rejecting prevents this claim from entering the project handover snapshot."
+        >
+          <div className="space-y-4 text-xs">
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground">Rejection Notes / Comments (Optional)</label>
               <textarea
                 rows={3}
                 value={rejectComments}
                 onChange={(e) => setRejectComments(e.target.value)}
-                placeholder="Reason for rejecting this claim from the handover..."
-                className="w-full rounded-md border bg-background px-3 py-2 text-xs"
+                placeholder="Explain why this claim is invalid or rejected from the project corpus..."
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t text-xs">
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setRejectModalOpen(false)}
-                className="rounded-md border px-4 py-2 hover:bg-muted font-medium"
+                className="rounded-lg border border-border px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -743,14 +732,14 @@ export default function ReviewSplitPanePage({
                 type="button"
                 disabled={submittingAction}
                 onClick={() => submitDecision("REJECTED", { comments: rejectComments.trim() })}
-                className="rounded-md bg-rose-600 text-white px-4 py-2 font-medium hover:bg-rose-700 disabled:opacity-50 inline-flex items-center gap-1.5"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 text-white px-4 py-1.5 text-xs font-semibold shadow-xs hover:bg-rose-700 transition-colors disabled:opacity-40 cursor-pointer"
               >
-                {submittingAction && <Loader2 className="h-3 w-3 animate-spin" />}
+                {submittingAction && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Reject Claim
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

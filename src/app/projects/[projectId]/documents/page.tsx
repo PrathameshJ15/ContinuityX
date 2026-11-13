@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState, use, useCallback } from "react";
+import Link from "next/link";
 import { formatDate } from "@/lib/date";
+import { PageHeader } from "@/components/ui/page-header";
+import { MetricCard } from "@/components/ui/metric-card";
+import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
+import { FilterPills } from "@/components/ui/filter-pills";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   Upload,
   FileText,
@@ -14,13 +22,13 @@ import {
   Loader2,
   Eye,
   Calendar,
-  X,
   Layers,
-  Info,
-  Download,
+  Sparkles,
+  Search,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
+  HardDrive,
+  FileCheck,
 } from "lucide-react";
 
 interface DocumentItem {
@@ -82,8 +90,13 @@ const PIPELINE_STEPS = [
 ] as const;
 
 function getStepIndex(status: DocumentItem["processingStatus"]): number {
-  const idx = PIPELINE_STEPS.findIndex((s) => s.key === status);
-  return idx;
+  return PIPELINE_STEPS.findIndex((s) => s.key === status);
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 export default function DocumentsPage({
@@ -107,7 +120,12 @@ export default function DocumentsPage({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Filters & Search
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
   // Upload Form & Drag-and-Drop state
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [documentDate, setDocumentDate] = useState("");
@@ -135,7 +153,7 @@ export default function DocumentsPage({
       if (!docsRes.ok) throw new Error(docsData.error?.message || "Failed to load documents");
 
       setProject(projData.data);
-      setDocuments(docsData.data.documents);
+      setDocuments(docsData.data.documents || []);
       if (docsData.data.pagination) {
         setPagination(docsData.data.pagination);
       }
@@ -203,8 +221,9 @@ export default function DocumentsPage({
 
       setSelectedFile(null);
       setDocumentDate("");
-      setSuccess(`Document '${data.data.fileName}' uploaded successfully. Processing started.`);
-      setTimeout(() => setSuccess(null), 4000);
+      setUploadModalOpen(false);
+      setSuccess(`Document '${data.data.fileName}' uploaded successfully. Processing pipeline started.`);
+      setTimeout(() => setSuccess(null), 5000);
       await loadData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -294,7 +313,7 @@ export default function DocumentsPage({
 
       setInspectDoc({
         doc,
-        chunks: data.data.document.chunks,
+        chunks: data.data.document.chunks || [],
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load chunks");
@@ -303,474 +322,547 @@ export default function DocumentsPage({
     }
   }
 
-  function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  }
+  // Filtered documents
+  const filteredDocuments = documents.filter((doc) => {
+    const matchesSearch =
+      doc.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.uploadedBy.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-  function renderStatusStepper(doc: DocumentItem) {
-    const isFailed =
-      doc.processingStatus === "VALIDATION_FAILED" ||
-      doc.processingStatus === "EXTRACTION_FAILED" ||
-      doc.processingStatus === "AI_PROCESSING_FAILED";
-    const activeIdx =
-      doc.processingStatus === "AI_COMPLETED" || doc.processingStatus === "AI_PROCESSING"
-        ? PIPELINE_STEPS.length - 1
-        : getStepIndex(doc.processingStatus);
+    if (!matchesSearch) return false;
 
-    return (
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-1.5">
-          {doc.processingStatus === "AI_COMPLETED" ? (
-            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-              <CheckCircle2 className="h-3 w-3" /> AI EXTRACTED
-            </span>
-          ) : doc.processingStatus === "READY_FOR_AI" ? (
-            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-              <CheckCircle2 className="h-3 w-3" /> READY FOR AI
-            </span>
-          ) : isFailed ? (
-            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-destructive/10 text-destructive">
-              <AlertCircle className="h-3 w-3" /> {doc.processingStatus.replace(/_/g, " ")}
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-              <Loader2 className="h-3 w-3 animate-spin" /> {doc.processingStatus.replace(/_/g, " ")}
-            </span>
-          )}
-        </div>
+    if (statusFilter === "READY") {
+      return doc.processingStatus === "READY_FOR_AI" || doc.processingStatus === "AI_COMPLETED";
+    }
+    if (statusFilter === "PROCESSING") {
+      return (
+        doc.processingStatus === "UPLOADED" ||
+        doc.processingStatus === "VALIDATING" ||
+        doc.processingStatus === "EXTRACTING" ||
+        doc.processingStatus === "CHUNKING" ||
+        doc.processingStatus === "AI_PROCESSING"
+      );
+    }
+    if (statusFilter === "FAILED") {
+      return (
+        doc.processingStatus === "VALIDATION_FAILED" ||
+        doc.processingStatus === "EXTRACTION_FAILED" ||
+        doc.processingStatus === "AI_PROCESSING_FAILED"
+      );
+    }
+    if (statusFilter === "WARNINGS") {
+      return doc.textQuality !== "OK";
+    }
 
-        {/* Stepper progress bar */}
-        {!isFailed && (
-          <div className="flex items-center gap-1" aria-label="Processing progress">
-            {PIPELINE_STEPS.map((step, i) => (
-              <div key={step.key} className="flex items-center gap-1" title={step.label}>
-                <span
-                  className={`h-1.5 w-5 rounded-full ${
-                    activeIdx >= i ? "bg-primary" : "bg-muted"
-                  }`}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+    return true;
+  });
 
-        {doc.lastJob?.lastError && (
-          <p className="text-[11px] text-destructive max-w-xs" title={doc.lastJob.lastError}>
-            {doc.lastJob.lastError}
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="py-20 flex flex-col items-center justify-center text-muted-foreground">
-        <Loader2 className="h-8 w-8 animate-spin mb-3 text-primary" />
-        <p className="text-sm font-medium">Loading documents...</p>
-      </div>
-    );
-  }
-
-  if (!project) return null;
-
-  const canUpload = project.currentUserRole === "OWNER" || project.currentUserRole === "REVIEWER";
+  const canUpload = project?.currentUserRole === "OWNER" || project?.currentUserRole === "REVIEWER";
   const lowQualityDocs = documents.filter((d) => d.textQuality !== "OK");
+  const readyDocs = documents.filter(
+    (d) => d.processingStatus === "READY_FOR_AI" || d.processingStatus === "AI_COMPLETED"
+  );
+  const totalChunks = documents.reduce((sum, d) => sum + (d.chunkCount || 0), 0);
+
+  if (loading && !documents.length) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          breadcrumbs={
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Link href="/dashboard" className="hover:text-foreground">Projects</Link>
+              <span>/</span>
+              <span>Documents</span>
+            </div>
+          }
+          title="Documents"
+          description="Loading project documentation workspace..."
+        />
+        <TableSkeleton rows={5} />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Project Documents</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Upload authorized project documentation (PDF, DOCX, CSV) for automated knowledge extraction.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-8">
+      {/* Header */}
+      <PageHeader
+        breadcrumbs={
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Link href="/dashboard" className="hover:text-foreground">Projects</Link>
+            <span>/</span>
+            <Link href={`/projects/${projectId}`} className="hover:text-foreground">{project?.name || "Project"}</Link>
+            <span>/</span>
+            <span className="text-foreground font-medium">Documents</span>
+          </div>
+        }
+        title="Project Documents"
+        description="Upload and manage authoritative project documentation (PDF, DOCX, CSV) for automated knowledge extraction."
+        actions={
+          canUpload ? (
+            <button
+              onClick={() => setUploadModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary/90 transition-all cursor-pointer"
+            >
+              <Upload className="h-4 w-4" />
+              Upload Document
+            </button>
+          ) : undefined
+        }
+      />
 
+      {/* Notifications */}
       {success && (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-800 dark:text-emerald-300">
-          <CheckCircle2 className="h-5 w-5 shrink-0" />
+        <div className="flex items-center gap-2.5 rounded-lg border border-emerald-500/20 bg-emerald-50/50 p-4 text-xs font-medium text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
           <span>{success}</span>
         </div>
       )}
 
       {error && (
-        <div role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-          <AlertCircle className="h-5 w-5 shrink-0" />
+        <div role="alert" className="flex items-center gap-2.5 rounded-lg border border-rose-500/20 bg-rose-50/50 p-4 text-xs font-medium text-rose-800 dark:bg-rose-950/20 dark:text-rose-300">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
           <span>{error}</span>
         </div>
       )}
 
       {lowQualityDocs.length > 0 && (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-400/50 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-amber-800 dark:text-amber-300">
-          <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-50/60 p-4 text-xs text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
           <div>
-            <p className="font-semibold">Needs Human Attention</p>
-            <p className="text-xs mt-0.5">
-              {lowQualityDocs.length} {lowQualityDocs.length === 1 ? "document has" : "documents have"} low printable text or appear to be scanned images (OCR is disabled in MVP). Review or upload a text-searchable version.
+            <p className="font-semibold">Review Alert: Low Text Quality Detected</p>
+            <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
+              {lowQualityDocs.length} {lowQualityDocs.length === 1 ? "document has" : "documents have"} low printable text or appear to be scanned images. Verify content or upload a native digital version.
             </p>
           </div>
         </div>
       )}
 
-      {/* Upload Zone (OWNER and REVIEWER only) */}
-      {canUpload ? (
-        <div className="rounded-xl border bg-card p-6 shadow-sm">
-          <h3 className="font-semibold text-base mb-1">Upload New Document</h3>
-          <p className="text-xs text-muted-foreground mb-4">
-            Supported formats: PDF (.pdf), Word (.docx), CSV (.csv). Maximum 10 MB per file.
-          </p>
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          title="Total Documents"
+          value={pagination.total}
+          subtitle="Indexed in project corpus"
+          icon={HardDrive}
+        />
+        <MetricCard
+          title="Ready / Extracted"
+          value={readyDocs.length}
+          subtitle="Available for verification & Q&A"
+          icon={FileCheck}
+        />
+        <MetricCard
+          title="Total Text Chunks"
+          value={totalChunks}
+          subtitle="Indexed for retrieval"
+          icon={Layers}
+        />
+        <MetricCard
+          title="Quality Warnings"
+          value={lowQualityDocs.length}
+          subtitle={lowQualityDocs.length === 0 ? "All documents verified OK" : "Scanned or low-text files"}
+          trend={lowQualityDocs.length > 0 ? { direction: "neutral", label: "Needs attention" } : undefined}
+          icon={AlertTriangle}
+        />
+      </div>
 
-          <form onSubmit={handleUpload} className="space-y-4">
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-              className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-                isDragging
-                  ? "border-primary bg-primary/5"
-                  : "border-input hover:border-primary/50"
-              }`}
-            >
-              <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm font-medium">
-                {selectedFile
-                  ? `Selected: ${selectedFile.name} (${formatBytes(selectedFile.size)})`
-                  : "Drag and drop a PDF, DOCX, or CSV file here, or browse"}
-              </p>
-              <label
-                htmlFor="docFile"
-                className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
-              >
-                Choose File
-              </label>
-              <input
-                id="docFile"
-                type="file"
-                accept=".pdf,.docx,.csv"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                className="sr-only"
-              />
-            </div>
+      {/* Filters & Search Toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+        <div className="flex items-center gap-2">
+          <FilterPills
+            options={[
+              { id: "ALL", label: "All Documents", count: documents.length },
+              { id: "READY", label: "Ready / Extracted", count: readyDocs.length },
+              {
+                id: "PROCESSING",
+                label: "In Pipeline",
+                count: documents.filter((d) =>
+                  ["UPLOADED", "VALIDATING", "EXTRACTING", "CHUNKING", "AI_PROCESSING"].includes(d.processingStatus)
+                ).length,
+              },
+              { id: "WARNINGS", label: "Warnings", count: lowQualityDocs.length },
+            ]}
+            selectedId={statusFilter}
+            onSelect={setStatusFilter}
+          />
+        </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 items-end">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium" htmlFor="docDate">
-                    Document Date (optional)
-                  </label>
-                  <span className="text-[10px] text-muted-foreground">Basis: USER_PROVIDED</span>
-                </div>
-                <input
-                  id="docDate"
-                  type="date"
-                  value={documentDate}
-                  onChange={(e) => setDocumentDate(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
+        <div className="relative min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by file name or uploader..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+          />
+        </div>
+      </div>
 
-              <div className="flex items-center justify-end">
+      {/* Document Table */}
+      {filteredDocuments.length === 0 ? (
+        <EmptyState
+          type={documents.length === 0 ? "no-data" : "checked-empty"}
+          title={documents.length === 0 ? "No documents uploaded yet" : "No matching documents found"}
+          description={
+            documents.length === 0
+              ? "Upload authorized architecture, decisions, or meeting notes to extract canonical claims."
+              : "Try adjusting your search query or filter pills to view available documents."
+          }
+          actionLabel={documents.length === 0 && canUpload ? "Upload First Document" : undefined}
+          onAction={documents.length === 0 && canUpload ? () => setUploadModalOpen(true) : undefined}
+        />
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-border bg-slate-50/75 dark:bg-slate-900/50 text-[11px] font-semibold text-muted-foreground">
+                  <th className="py-3 px-4 font-semibold">Document</th>
+                  <th className="py-3 px-3 font-semibold">Pipeline Status</th>
+                  <th className="py-3 px-3 font-semibold">Quality</th>
+                  <th className="py-3 px-3 font-semibold">Source Date</th>
+                  <th className="py-3 px-3 font-semibold text-center">Chunks</th>
+                  <th className="py-3 px-4 font-semibold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {filteredDocuments.map((doc) => {
+                  const isFailed = [
+                    "VALIDATION_FAILED",
+                    "EXTRACTION_FAILED",
+                    "AI_PROCESSING_FAILED",
+                  ].includes(doc.processingStatus);
+
+                  const activeIdx =
+                    doc.processingStatus === "AI_COMPLETED" || doc.processingStatus === "AI_PROCESSING"
+                      ? PIPELINE_STEPS.length - 1
+                      : getStepIndex(doc.processingStatus);
+
+                  return (
+                    <tr key={doc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/25 transition-colors">
+                      {/* Document Name & Meta */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-muted-foreground shrink-0 mt-0.5">
+                            {doc.mimeType === "text/csv" ? (
+                              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <FileText className="h-4 w-4 text-indigo-600" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-foreground truncate max-w-[280px]" title={doc.fileName}>
+                              {doc.fileName}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {formatBytes(doc.fileSize)} • Uploaded {formatDate(doc.uploadedAt)} by {doc.uploadedBy.name}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Pipeline Status */}
+                      <td className="py-3.5 px-3">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                            {doc.processingStatus === "AI_COMPLETED" ? (
+                              <Badge variant="verified">AI EXTRACTED</Badge>
+                            ) : doc.processingStatus === "READY_FOR_AI" ? (
+                              <Badge variant="success">READY FOR AI</Badge>
+                            ) : isFailed ? (
+                              <Badge variant="destructive">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                {doc.processingStatus.replace(/_/g, " ")}
+                              </Badge>
+                            ) : (
+                              <Badge variant="neutral">
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin text-primary" />
+                                {doc.processingStatus.replace(/_/g, " ")}
+                              </Badge>
+                            )}
+                          </div>
+
+                          {!isFailed && (
+                            <div className="flex items-center gap-1" aria-label="Processing progress">
+                              {PIPELINE_STEPS.map((step, i) => (
+                                <div
+                                  key={step.key}
+                                  className={`h-1 w-4 rounded-full ${
+                                    activeIdx >= i ? "bg-primary" : "bg-slate-200 dark:bg-slate-800"
+                                  }`}
+                                  title={step.label}
+                                />
+                              ))}
+                            </div>
+                          )}
+
+                          {doc.lastJob?.lastError && (
+                            <p className="text-[10px] text-rose-600 truncate max-w-[180px]" title={doc.lastJob.lastError}>
+                              {doc.lastJob.lastError}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Quality */}
+                      <td className="py-3.5 px-3">
+                        {doc.textQuality === "OK" ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Text OK
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400" title="Scanned or low readable text">
+                            <AlertTriangle className="h-3.5 w-3.5" /> {doc.textQuality}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Source Date */}
+                      <td className="py-3.5 px-3">
+                        <div className="space-y-0.5">
+                          <p className="font-medium text-foreground">
+                            {doc.sourceDate ? formatDate(doc.sourceDate) : "—"}
+                          </p>
+                          <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tight">
+                            {doc.sourceDateBasis.replace(/_/g, " ")}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Chunks */}
+                      <td className="py-3.5 px-3 text-center">
+                        <button
+                          onClick={() => handleInspect(doc)}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-mono text-[11px] font-semibold text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                        >
+                          <Layers className="h-3 w-3" />
+                          {doc.chunkCount || 0}
+                        </button>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* AI Extraction Button */}
+                          {(doc.processingStatus === "READY_FOR_AI" || doc.processingStatus === "AI_COMPLETED") && canUpload && (
+                            <button
+                              onClick={() => handleExtract(doc.id)}
+                              disabled={extractingDocId === doc.id}
+                              className="inline-flex items-center gap-1 rounded-md bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Run automated claim extraction using Gemini LLM"
+                            >
+                              {extractingDocId === doc.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />
+                              ) : (
+                                <Sparkles className="h-3 w-3 text-indigo-600" />
+                              )}
+                              <span>Extract</span>
+                            </button>
+                          )}
+
+                          {/* Inspect Chunks */}
+                          <button
+                            onClick={() => handleInspect(doc)}
+                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Inspect parsed text chunks"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
+
+                          {/* Retry */}
+                          {isFailed && canUpload && (
+                            <button
+                              onClick={() => handleRetry(doc.id)}
+                              className="p-1.5 rounded-md text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                              title="Retry pipeline execution"
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+
+                          {/* Delete */}
+                          {canUpload && (
+                            <button
+                              onClick={() => handleDelete(doc.id, doc.fileName)}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Soft delete document"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-border px-4 py-3 bg-slate-50/50 dark:bg-slate-900/30 text-xs text-muted-foreground">
+              <span>
+                Showing page <strong className="text-foreground">{pagination.page}</strong> of{" "}
+                <strong className="text-foreground">{pagination.totalPages}</strong> ({pagination.total} documents)
+              </span>
+              <div className="flex items-center gap-1.5">
                 <button
-                  type="submit"
-                  disabled={uploading || !selectedFile}
-                  className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
                 >
-                  {uploading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4" /> Upload Document
-                    </>
-                  )}
+                  <ChevronLeft className="h-3.5 w-3.5" /> Previous
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                  disabled={page >= pagination.totalPages}
+                  className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium hover:bg-accent transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  Next <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
-
-            <p className="text-xs text-muted-foreground border-t pt-2">
-              File modification metadata and upload time are never used as document chronology.
-            </p>
-          </form>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
-          <Info className="h-4 w-4 shrink-0 text-primary" />
-          <span>You have VIEWER access. Contact an Owner or Reviewer to upload project documents.</span>
+          )}
         </div>
       )}
 
-      {/* Document Roster Table */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold text-base">Uploaded Documents ({pagination.total})</h3>
-          {loadingChunks && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-        </div>
+      {/* Upload Modal */}
+      <Modal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        title="Upload Document"
+        description="Select a file to parse and index into the project knowledge corpus."
+      >
+        <form onSubmit={handleUpload} className="space-y-4">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`rounded-xl border-2 border-dashed p-6 text-center transition-all ${
+              isDragging
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/50 bg-slate-50/50 dark:bg-slate-900/30"
+            }`}
+          >
+            <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+            <p className="text-xs font-medium text-foreground">
+              {selectedFile
+                ? `Selected: ${selectedFile.name} (${formatBytes(selectedFile.size)})`
+                : "Drag & drop your document here, or choose from files"}
+            </p>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Supports PDF (.pdf), Word (.docx), CSV (.csv) up to 10 MB
+            </p>
 
-        {documents.length === 0 ? (
-          <div className="p-12 text-center text-muted-foreground">
-            <FileText className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
-            <p className="font-medium text-sm">No documents uploaded yet.</p>
-            <p className="text-xs mt-1">Upload meeting notes, design documents, or task spreadsheets to begin.</p>
+            <label
+              htmlFor="modalFileInput"
+              className="mt-3.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-xs hover:bg-accent transition-colors"
+            >
+              Browse Files
+            </label>
+            <input
+              id="modalFileInput"
+              type="file"
+              accept=".pdf,.docx,.csv"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) setSelectedFile(file);
+              }}
+              className="hidden"
+            />
           </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted/50 text-xs text-muted-foreground uppercase">
-                  <tr>
-                    <th className="px-6 py-3 font-semibold">Document</th>
-                    <th className="px-6 py-3 font-semibold">Source Date</th>
-                    <th className="px-6 py-3 font-semibold">Status</th>
-                    <th className="px-6 py-3 font-semibold">Quality</th>
-                    <th className="px-6 py-3 font-semibold">Chunks</th>
-                    <th className="px-6 py-3 font-semibold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {documents.map((doc) => {
-                    const isPdf = doc.mimeType === "application/pdf";
-                    const isCsv = doc.mimeType === "text/csv";
 
-                    return (
-                      <tr key={doc.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="rounded bg-muted p-2 text-primary shrink-0">
-                              {isCsv ? (
-                                <FileSpreadsheet className="h-5 w-5" />
-                              ) : (
-                                <FileText className="h-5 w-5" />
-                              )}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-foreground truncate max-w-xs sm:max-w-md">
-                                {doc.fileName}
-                              </div>
-                              <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                                <span>{formatBytes(doc.fileSize)}</span>
-                                <span>•</span>
-                                <span>
-                                  {isPdf
-                                    ? `${doc.pageCount} ${doc.pageCount === 1 ? "page" : "pages"}`
-                                    : isCsv
-                                    ? "CSV Table"
-                                    : "Word DOCX"}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-6 py-4 text-xs">
-                          {doc.sourceDate ? (
-                            <div className="space-y-0.5">
-                              <div className="font-medium flex items-center gap-1">
-                                <Calendar className="h-3 w-3 text-primary" />
-                                {formatDate(doc.sourceDate)}
-                              </div>
-                              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.2 rounded">
-                                {doc.sourceDateBasis}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground italic">Unknown (Undated)</span>
-                          )}
-                        </td>
-
-                        <td className="px-6 py-4">{renderStatusStepper(doc)}</td>
-
-                        <td className="px-6 py-4">
-                          {doc.textQuality === "OK" ? (
-                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                              OK
-                            </span>
-                          ) : (
-                            <span
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 rounded px-2 py-0.5"
-                              title="Needs human attention: low printable text or suspected scan."
-                            >
-                              <AlertTriangle className="h-3 w-3" />
-                              {doc.textQuality === "SCANNED_SUSPECTED"
-                                ? "Needs Attention (Scanned)"
-                                : "Needs Attention (Low Text)"}
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="px-6 py-4 text-xs font-medium">
-                          {doc.chunkCount > 0 ? (
-                            <span className="inline-flex items-center gap-1">
-                              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                              {doc.chunkCount} {doc.chunkCount === 1 ? "chunk" : "chunks"}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {doc.chunkCount > 0 && (
-                              <button
-                                onClick={() => handleInspect(doc)}
-                                title="Inspect extracted chunks and source locations"
-                                className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </button>
-                            )}
-
-                            <a
-                              href={`/api/projects/${projectId}/documents/${doc.id}/download`}
-                              title="Download private file"
-                              className="rounded p-1 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <Download className="h-4 w-4" />
-                            </a>
-
-                            {(doc.processingStatus === "READY_FOR_AI" ||
-                              doc.processingStatus === "AI_COMPLETED" ||
-                              doc.processingStatus === "AI_PROCESSING_FAILED") &&
-                              doc.chunkCount > 0 &&
-                              canUpload && (
-                                <button
-                                  onClick={() => handleExtract(doc.id)}
-                                  disabled={extractingDocId === doc.id}
-                                  title="Run AI claim extraction on document chunks"
-                                  className="inline-flex items-center gap-1 rounded px-2 py-1 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 text-xs font-medium transition-colors"
-                                >
-                                  {extractingDocId === doc.id ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Sparkles className="h-3.5 w-3.5" />
-                                  )}
-                                  {doc.processingStatus === "AI_PROCESSING_FAILED"
-                                    ? "Retry AI"
-                                    : doc.processingStatus === "AI_COMPLETED"
-                                      ? "Re-run AI"
-                                      : "Run Extraction"}
-                                </button>
-                              )}
-
-                            {(doc.processingStatus === "VALIDATION_FAILED" ||
-                              doc.processingStatus === "EXTRACTION_FAILED") &&
-                              canUpload && (
-                                <button
-                                  onClick={() => handleRetry(doc.id)}
-                                  title="Retry processing"
-                                  className="inline-flex items-center gap-1 rounded px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium transition-colors"
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5" /> Retry
-                                </button>
-                              )}
-
-                            {canUpload && (
-                              <button
-                                onClick={() => handleDelete(doc.id, doc.fileName)}
-                                title="Remove document (Soft Delete)"
-                                className="rounded p-1 hover:bg-muted text-destructive hover:text-destructive/80 transition-colors"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <div>
+            <label className="block text-xs font-medium text-foreground mb-1.5">
+              Source Document Date (Optional)
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="date"
+                value={documentDate}
+                onChange={(e) => setDocumentDate(e.target.value)}
+                className="w-full rounded-lg border border-border bg-card pl-9 pr-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+              />
             </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Provides deterministic chronological priority during conflict resolution if explicit in the document.
+            </p>
+          </div>
 
-            {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between border-t px-6 py-3 text-xs text-muted-foreground">
-                <span>
-                  Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1}
-                    className="inline-flex items-center gap-1 rounded border px-2 py-1 hover:bg-muted disabled:opacity-40"
+          <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+            <button
+              type="button"
+              onClick={() => setUploadModalOpen(false)}
+              className="rounded-lg border border-border px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!selectedFile || uploading}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-colors disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                "Start Processing"
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Inspect Document Modal */}
+      {inspectDoc && (
+        <Modal
+          isOpen={!!inspectDoc}
+          onClose={() => setInspectDoc(null)}
+          title={`Document Inspector: ${inspectDoc.doc.fileName}`}
+          description={`${inspectDoc.chunks.length} chunks indexed • ${inspectDoc.doc.mimeType} • ${formatBytes(inspectDoc.doc.fileSize)}`}
+          maxWidth="3xl"
+        >
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            {loadingChunks ? (
+              <div className="py-12 flex justify-center text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : inspectDoc.chunks.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-8">
+                No chunks have been generated for this document yet.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {inspectDoc.chunks.map((chunk) => (
+                  <div
+                    key={chunk.id}
+                    className="rounded-lg border border-border bg-slate-50/50 dark:bg-slate-900/40 p-3.5 text-xs space-y-1.5"
                   >
-                    <ChevronLeft className="h-3.5 w-3.5" /> Prev
-                  </button>
-                  <button
-                    onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                    disabled={page >= pagination.totalPages}
-                    className="inline-flex items-center gap-1 rounded border px-2 py-1 hover:bg-muted disabled:opacity-40"
-                  >
-                    Next <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span className="font-mono font-semibold text-primary">Chunk #{chunk.chunkIndex + 1}</span>
+                      <span className="font-mono">
+                        {chunk.pageNumber ? `Page ${chunk.pageNumber}` : ""}
+                        {chunk.sectionTitle ? ` • ${chunk.sectionTitle}` : ""}
+                        {chunk.rowStart !== null && chunk.rowEnd !== null ? ` • Rows ${chunk.rowStart}–${chunk.rowEnd}` : ""}
+                      </span>
+                    </div>
+                    <pre className="text-foreground whitespace-pre-wrap font-sans text-xs bg-card p-2.5 rounded border border-border/60 max-h-40 overflow-y-auto">
+                      {chunk.content}
+                    </pre>
+                  </div>
+                ))}
               </div>
             )}
-          </>
-        )}
-      </div>
-
-      {/* Chunk Inspection Drawer Modal */}
-      {inspectDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-3xl rounded-xl border bg-card shadow-lg flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between border-b px-6 py-4">
-              <div>
-                <h3 className="font-semibold text-lg">{inspectDoc.doc.fileName}</h3>
-                <p className="text-xs text-muted-foreground">
-                  Extracted Chunks ({inspectDoc.chunks.length}) • Checksum:{" "}
-                  <code className="text-[10px]">{inspectDoc.doc.checksum.slice(0, 16)}...</code>
-                </p>
-              </div>
-              <button
-                onClick={() => setInspectDoc(null)}
-                className="rounded-md p-1 hover:bg-muted text-muted-foreground transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {inspectDoc.chunks.map((chunk) => (
-                <div key={chunk.id} className="rounded-lg border bg-muted/20 p-4 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground border-b pb-2">
-                    <span className="font-semibold text-foreground">
-                      Chunk #{chunk.chunkIndex + 1}
-                    </span>
-                    <span className="bg-background border rounded px-2 py-0.5">
-                      {chunk.pageNumber
-                        ? `Page ${chunk.pageNumber}`
-                        : chunk.sectionTitle
-                        ? `Section: ${chunk.sectionTitle}`
-                        : chunk.rowStart
-                        ? `Rows ${chunk.rowStart}–${chunk.rowEnd}`
-                        : "Location: Unknown"}
-                    </span>
-                  </div>
-                  <pre className="text-xs whitespace-pre-wrap font-sans text-foreground/90 leading-relaxed">
-                    {chunk.content}
-                  </pre>
-                </div>
-              ))}
-            </div>
-
-            <div className="border-t px-6 py-3 flex justify-end">
-              <button
-                onClick={() => setInspectDoc(null)}
-                className="rounded-md bg-muted px-4 py-2 text-sm font-medium hover:bg-muted/80 transition-colors"
-              >
-                Close
-              </button>
-            </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
