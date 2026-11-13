@@ -109,18 +109,19 @@ export default function ContinuityIntelligencePage({
     },
   ]);
 
-  const loadIntelligence = useCallback(async () => {
+  const loadIntelligence = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`/api/projects/${projectId}/intelligence`);
+      const res = await fetch(`/api/projects/${projectId}/intelligence`, { signal });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Failed to load continuity intelligence");
 
       setScoreData(json.data.score);
       setBusFactorData(json.data.busFactor);
     } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to load intelligence data");
     } finally {
       setLoading(false);
@@ -128,7 +129,12 @@ export default function ContinuityIntelligencePage({
   }, [projectId]);
 
   useEffect(() => {
-    loadIntelligence();
+    const controller = new AbortController();
+    loadIntelligence(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
   }, [loadIntelligence]);
 
   const handleAskQuestion = async (qText?: string) => {
@@ -318,7 +324,7 @@ export default function ContinuityIntelligencePage({
                   </div>
 
                   <button
-                    onClick={loadIntelligence}
+                    onClick={() => loadIntelligence()}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent self-start md:self-auto shrink-0 shadow-xs cursor-pointer transition-colors"
                   >
                     <RotateCw className="h-3.5 w-3.5" />

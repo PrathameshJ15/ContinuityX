@@ -40,13 +40,16 @@ export default function ProjectWorkspaceLayout({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let isMounted = true;
+
     async function loadWorkspaceData() {
       try {
         setLoading(true);
         const [projRes, projectsRes, meRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}`),
-          fetch("/api/projects"),
-          fetch("/api/auth/me"),
+          fetch(`/api/projects/${projectId}`, { signal: controller.signal }),
+          fetch("/api/projects", { signal: controller.signal }),
+          fetch("/api/auth/me", { signal: controller.signal }),
         ]);
 
         if (projRes.status === 401) {
@@ -56,35 +59,49 @@ export default function ProjectWorkspaceLayout({
 
         const projData = await projRes.json();
         if (!projRes.ok) {
-          setErrorStatus(projRes.status);
-          setErrorMessage(projData.error?.message || "Failed to load project workspace");
+          if (isMounted) {
+            setErrorStatus(projRes.status);
+            setErrorMessage(projData.error?.message || "Failed to load project workspace");
+          }
           return;
         }
 
-        setProject(projData.data);
+        if (isMounted) {
+          setProject(projData.data);
+        }
 
         if (projectsRes.ok) {
           const listJson = await projectsRes.json();
-          if (Array.isArray(listJson.data?.projects)) {
+          if (Array.isArray(listJson.data?.projects) && isMounted) {
             setAllProjects(listJson.data.projects);
           }
         }
 
         if (meRes.ok) {
           const meJson = await meRes.json();
-          if (meJson.data?.user) {
+          if (meJson.data?.user && isMounted) {
             setUser(meJson.data.user);
           }
         }
       } catch (err: unknown) {
-        setErrorStatus(500);
-        setErrorMessage(err instanceof Error ? err.message : "Network error");
+        if (err instanceof Error && err.name === "AbortError") return;
+        if (isMounted) {
+          setErrorStatus(500);
+          setErrorMessage(err instanceof Error ? err.message : "Network error");
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
     loadWorkspaceData();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
   }, [projectId, router]);
 
   if (loading) {

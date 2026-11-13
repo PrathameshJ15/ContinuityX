@@ -137,7 +137,7 @@ export default function ProjectOverviewPage({
   const [reviewQueueData, setReviewQueueData] = useState<ReviewQueueData | null>(null);
   const [documentsData, setDocumentsData] = useState<DocumentItem[]>([]);
 
-  const loadAllProjectData = useCallback(async () => {
+  const loadAllProjectData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
@@ -149,13 +149,15 @@ export default function ProjectOverviewPage({
         reviewRes,
         docsRes,
       ] = await Promise.allSettled([
-        fetch(`/api/projects/${projectId}`),
-        fetch(`/api/projects/${projectId}/intelligence`),
-        fetch(`/api/projects/${projectId}/radar`),
-        fetch(`/api/projects/${projectId}/conflicts`),
-        fetch(`/api/projects/${projectId}/review/queue`),
-        fetch(`/api/projects/${projectId}/documents`),
+        fetch(`/api/projects/${projectId}`, { signal }),
+        fetch(`/api/projects/${projectId}/intelligence`, { signal }),
+        fetch(`/api/projects/${projectId}/radar`, { signal }),
+        fetch(`/api/projects/${projectId}/conflicts`, { signal }),
+        fetch(`/api/projects/${projectId}/review/queue`, { signal }),
+        fetch(`/api/projects/${projectId}/documents`, { signal }),
       ]);
+
+      if (signal?.aborted) return;
 
       if (projRes.status === "fulfilled" && projRes.value.ok) {
         const pJson = await projRes.value.json();
@@ -198,7 +200,12 @@ export default function ProjectOverviewPage({
   }, [projectId]);
 
   useEffect(() => {
-    loadAllProjectData();
+    const controller = new AbortController();
+    loadAllProjectData(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
   }, [loadAllProjectData]);
 
   async function handleUpdate(e: React.FormEvent) {
