@@ -177,7 +177,7 @@ export default function DocumentsPage({
       } catch (err) {
         console.error("Auto-process step error:", err);
       }
-    }, 1000);
+    }, 3500);
 
     return () => clearTimeout(timer);
   }, [documents, projectId, loadData]);
