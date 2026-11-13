@@ -8,6 +8,7 @@ interface RouteParams {
 }
 
 export async function GET(_req: NextRequest, { params }: RouteParams) {
+  const startTime = performance.now();
   try {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
@@ -15,8 +16,15 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
     const { id: projectId } = await params;
     const result = await computeContinuityIntelligenceService(projectId, user.id);
 
-    return jsonSuccess(result);
+    const duration = performance.now() - startTime;
+    console.log(`[API Timing] GET /api/projects/${projectId}/intelligence completed in ${duration.toFixed(2)} ms`);
+
+    const response = jsonSuccess(result);
+    response.headers.set("Server-Timing", `total;dur=${duration.toFixed(2)}`);
+    return response;
   } catch (err: unknown) {
+    const duration = performance.now() - startTime;
+    console.log(`[API Timing] GET /api/projects/intelligence failed after ${duration.toFixed(2)} ms`);
     return handleApiError(err);
   }
 }

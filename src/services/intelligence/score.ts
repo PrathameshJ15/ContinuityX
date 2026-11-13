@@ -52,28 +52,29 @@ export async function computeContinuityIntelligenceService(
 ): Promise<{ score: ContinuityScoreResult; busFactor: BusFactorMapResult }> {
   await requireProjectAccess(projectId, "project:read", userId);
 
-  // 1. Fetch project entities (excluding merged)
-  const entities = await prisma.entity.findMany({
-    where: { projectId, mergedIntoId: null },
-  });
-
-  // 2. Fetch non-rejected claims
-  const claims = await prisma.claim.findMany({
-    where: { projectId, reviewState: { not: "REJECTED" } },
-    include: {
-      subjectEntity: true,
-      verifications: { orderBy: { verifiedAt: "desc" }, take: 1 },
-      evidence: true,
-    },
-  });
-
-  // 3. Fetch active conflicts
-  const openConflicts = await prisma.conflict.findMany({
-    where: {
-      projectId,
-      status: { in: ["OPEN", "POSSIBLY_SUPERSEDED", "UNDER_REVIEW", "REQUIRES_CLARIFICATION"] },
-    },
-  });
+  // 1. Fetch independent project data in parallel (entities, claims, conflicts)
+  const [entities, claims, openConflicts] = await Promise.all([
+    // Project entities (excluding merged)
+    prisma.entity.findMany({
+      where: { projectId, mergedIntoId: null },
+    }),
+    // Non-rejected claims with relations
+    prisma.claim.findMany({
+      where: { projectId, reviewState: { not: "REJECTED" } },
+      include: {
+        subjectEntity: true,
+        verifications: { orderBy: { verifiedAt: "desc" }, take: 1 },
+        evidence: true,
+      },
+    }),
+    // Active conflicts
+    prisma.conflict.findMany({
+      where: {
+        projectId,
+        status: { in: ["OPEN", "POSSIBLY_SUPERSEDED", "UNDER_REVIEW", "REQUIRES_CLARIFICATION"] },
+      },
+    }),
+  ]);
 
   // Map claims by subject entity ID
   const claimsByEntity = new Map<string, typeof claims>();

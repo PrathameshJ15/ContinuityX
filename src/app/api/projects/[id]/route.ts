@@ -8,11 +8,20 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const startTime = performance.now();
   try {
     const { id } = await params;
     const project = await getProjectService(id);
-    return jsonSuccess(project);
+
+    const duration = performance.now() - startTime;
+    console.log(`[API Timing] GET /api/projects/${id} completed in ${duration.toFixed(2)} ms`);
+
+    const response = jsonSuccess(project);
+    response.headers.set("Server-Timing", `total;dur=${duration.toFixed(2)}`);
+    return response;
   } catch (error) {
+    const duration = performance.now() - startTime;
+    console.log(`[API Timing] GET /api/projects failed after ${duration.toFixed(2)} ms`);
     return handleApiError(error);
   }
 }

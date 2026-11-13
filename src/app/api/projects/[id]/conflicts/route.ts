@@ -9,6 +9,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const startTime = performance.now();
   try {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
@@ -27,57 +28,56 @@ export async function GET(
     const where: { projectId: string; status?: ConflictResolutionState } = { projectId };
     if (status) where.status = status;
 
-    const conflicts = await prisma.conflict.findMany({
-      where,
-      orderBy: [{ createdAt: "desc" }],
-      include: {
-        subjectEntity: {
-          select: { id: true, canonicalName: true, type: true },
-        },
-        claimA: {
-          select: {
-            id: true,
-            attributeKey: true,
-            valueRaw: true,
-            valueNormalized: true,
-            reviewState: true,
-            evidence: {
-              select: {
-                id: true,
-                sourceLocation: true,
-                excerpt: true,
-                document: {
-                  select: { id: true, fileName: true, sourceDate: true, sourceDateBasis: true },
+    const [conflicts, totalProjectClaims, allConflictsForCounts] = await Promise.all([
+      prisma.conflict.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }],
+        include: {
+          subjectEntity: {
+            select: { id: true, canonicalName: true, type: true },
+          },
+          claimA: {
+            select: {
+              id: true,
+              attributeKey: true,
+              valueRaw: true,
+              valueNormalized: true,
+              reviewState: true,
+              evidence: {
+                select: {
+                  id: true,
+                  sourceLocation: true,
+                  excerpt: true,
+                  document: {
+                    select: { id: true, fileName: true, sourceDate: true, sourceDateBasis: true },
+                  },
                 },
+                take: 1,
               },
-              take: 1,
+            },
+          },
+          claimB: {
+            select: {
+              id: true,
+              attributeKey: true,
+              valueRaw: true,
+              valueNormalized: true,
+              reviewState: true,
+              evidence: {
+                select: {
+                  id: true,
+                  sourceLocation: true,
+                  excerpt: true,
+                  document: {
+                    select: { id: true, fileName: true, sourceDate: true, sourceDateBasis: true },
+                  },
+                },
+                take: 1,
+              },
             },
           },
         },
-        claimB: {
-          select: {
-            id: true,
-            attributeKey: true,
-            valueRaw: true,
-            valueNormalized: true,
-            reviewState: true,
-            evidence: {
-              select: {
-                id: true,
-                sourceLocation: true,
-                excerpt: true,
-                document: {
-                  select: { id: true, fileName: true, sourceDate: true, sourceDateBasis: true },
-                },
-              },
-              take: 1,
-            },
-          },
-        },
-      },
-    });
-
-    const [totalProjectClaims, allConflictsForCounts] = await Promise.all([
+      }),
       prisma.claim.count({ where: { projectId } }),
       prisma.conflict.findMany({
         where: { projectId },
@@ -93,8 +93,15 @@ export async function GET(
       RESOLVED: allConflictsForCounts.filter((c) => c.status.startsWith("RESOLVED_")).length,
     };
 
-    return jsonSuccess({ conflicts, totalProjectClaims, counts });
+    const duration = performance.now() - startTime;
+    console.log(`[API Timing] GET /api/projects/${projectId}/conflicts completed in ${duration.toFixed(2)} ms`);
+
+    const response = jsonSuccess({ conflicts, totalProjectClaims, counts });
+    response.headers.set("Server-Timing", `total;dur=${duration.toFixed(2)}`);
+    return response;
   } catch (error) {
+    const duration = performance.now() - startTime;
+    console.log(`[API Timing] GET /api/projects/conflicts failed after ${duration.toFixed(2)} ms`);
     return handleApiError(error);
   }
 }

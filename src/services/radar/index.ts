@@ -74,66 +74,66 @@ export async function computeRadarAlertsService(
 ): Promise<{ alerts: RadarAlert[]; metrics: RadarMetrics }> {
   await requireProjectAccess(projectId, "project:read", userId);
 
-  // 1. Fetch non-rejected claims with relations
-  const claims = await prisma.claim.findMany({
-    where: {
-      projectId,
-      reviewState: { not: "REJECTED" },
-    },
-    include: {
-      subjectEntity: true,
-      verifications: {
-        orderBy: { verifiedAt: "desc" },
-        take: 1,
+  // 1. Fetch all independent project data in parallel
+  const [claims, entities, conflicts, dismissals] = await Promise.all([
+    // Non-rejected claims with relations
+    prisma.claim.findMany({
+      where: {
+        projectId,
+        reviewState: { not: "REJECTED" },
       },
-      evidence: {
-        include: {
-          document: {
-            select: { id: true, fileName: true, checksum: true },
+      include: {
+        subjectEntity: true,
+        verifications: {
+          orderBy: { verifiedAt: "desc" },
+          take: 1,
+        },
+        evidence: {
+          include: {
+            document: {
+              select: { id: true, fileName: true, checksum: true },
+            },
           },
         },
       },
-    },
-  });
-
-  // 2. Fetch all entities for project (excluding merged duplicates)
-  const entities = await prisma.entity.findMany({
-    where: {
-      projectId,
-      mergedIntoId: null, // Merged entities are counted once under their canonical target
-    },
-  });
-
-  // 3. Fetch active conflicts
-  const conflicts = await prisma.conflict.findMany({
-    where: {
-      projectId,
-      status: { in: ["OPEN", "POSSIBLY_SUPERSEDED", "UNDER_REVIEW", "REQUIRES_CLARIFICATION"] },
-    },
-    include: {
-      subjectEntity: true,
-      claimA: {
-        include: {
-          verifications: { orderBy: { verifiedAt: "desc" }, take: 1 },
-          evidence: { include: { document: true } },
+    }),
+    // All entities for project (excluding merged duplicates)
+    prisma.entity.findMany({
+      where: {
+        projectId,
+        mergedIntoId: null,
+      },
+    }),
+    // Active conflicts
+    prisma.conflict.findMany({
+      where: {
+        projectId,
+        status: { in: ["OPEN", "POSSIBLY_SUPERSEDED", "UNDER_REVIEW", "REQUIRES_CLARIFICATION"] },
+      },
+      include: {
+        subjectEntity: true,
+        claimA: {
+          include: {
+            verifications: { orderBy: { verifiedAt: "desc" }, take: 1 },
+            evidence: { include: { document: true } },
+          },
+        },
+        claimB: {
+          include: {
+            verifications: { orderBy: { verifiedAt: "desc" }, take: 1 },
+            evidence: { include: { document: true } },
+          },
         },
       },
-      claimB: {
-        include: {
-          verifications: { orderBy: { verifiedAt: "desc" }, take: 1 },
-          evidence: { include: { document: true } },
-        },
+    }),
+    // Stored dismissals
+    prisma.radarDismissal.findMany({
+      where: { projectId },
+      include: {
+        dismissedBy: { select: { id: true, name: true, email: true } },
       },
-    },
-  });
-
-  // 4. Fetch stored dismissals
-  const dismissals = await prisma.radarDismissal.findMany({
-    where: { projectId },
-    include: {
-      dismissedBy: { select: { id: true, name: true, email: true } },
-    },
-  });
+    }),
+  ]);
   const dismissalMap = new Map(dismissals.map((d) => [d.alertKey, d]));
 
   // Index claims by subject entity ID

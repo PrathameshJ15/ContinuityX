@@ -76,22 +76,58 @@ export async function requireProjectAccess(
   permission: Permission,
   explicitUserId?: string
 ): Promise<ProjectAccessContext> {
-  let user: AuthenticatedUser;
-
+  // Single round-trip: Check membership, role, project existence, and user details simultaneously
   if (explicitUserId) {
-    const dbUser = await prisma.user.findUnique({
-      where: { id: explicitUserId },
-      select: { id: true, email: true, name: true },
+    const membership = await prisma.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId,
+          userId: explicitUserId,
+        },
+      },
+      include: {
+        project: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
     });
-    if (!dbUser) {
-      throw new UnauthorizedError("User not found.");
+
+    if (!membership || !membership.project) {
+      throw new ProjectNotFoundError();
     }
-    user = dbUser;
-  } else {
-    user = await requireUser();
+
+    if (!hasPermission(membership.role, permission)) {
+      throw new ForbiddenError(
+        `Role '${membership.role}' does not have permission '${permission}' on this project.`
+      );
+    }
+
+    const resolvedUser: AuthenticatedUser = (membership as { user?: AuthenticatedUser }).user ?? {
+      id: explicitUserId,
+      name: "Project Member",
+      email: "",
+    };
+
+    return {
+      user: resolvedUser,
+      projectId,
+      role: membership.role,
+    };
   }
 
-  // Check if project exists and user is a member in a single query
+  // If explicitUserId was not passed, resolve user from session cookie
+  const user = await requireUser();
+
   const membership = await prisma.projectMember.findUnique({
     where: {
       projectId_userId: {
@@ -109,12 +145,10 @@ export async function requireProjectAccess(
     },
   });
 
-  // Unified response for "project does not exist" and "you are not a member" (404)
   if (!membership || !membership.project) {
     throw new ProjectNotFoundError();
   }
 
-  // Check role against authoritative permission matrix
   if (!hasPermission(membership.role, permission)) {
     throw new ForbiddenError(
       `Role '${membership.role}' does not have permission '${permission}' on this project.`

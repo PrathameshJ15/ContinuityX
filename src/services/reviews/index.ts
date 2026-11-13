@@ -172,44 +172,46 @@ export async function getReviewQueueService(
 ) {
   await requireProjectAccess(projectId, "claims:view_unapproved", userId);
 
-  // Fetch all latest version claims
-  const claims = await prisma.claim.findMany({
-    where: {
-      projectId,
-      supersededBy: { none: {} },
-    },
-    include: {
-      subjectEntity: {
-        include: { aliases: true },
+  // Fetch all latest version claims and open conflict count in parallel
+  const [claims, openConflictsCount] = await Promise.all([
+    prisma.claim.findMany({
+      where: {
+        projectId,
+        supersededBy: { none: {} },
       },
-      evidence: {
-        include: {
-          document: {
-            select: { id: true, fileName: true, sourceDate: true, sourceDateBasis: true },
+      include: {
+        subjectEntity: {
+          include: { aliases: true },
+        },
+        evidence: {
+          include: {
+            document: {
+              select: { id: true, fileName: true, sourceDate: true, sourceDateBasis: true },
+            },
+            chunk: true,
           },
-          chunk: true,
+        },
+        verifications: {
+          orderBy: { verifiedAt: "desc" },
+          take: 1,
+        },
+        conflictsAsA: {
+          where: { status: "OPEN" },
+        },
+        conflictsAsB: {
+          where: { status: "OPEN" },
         },
       },
-      verifications: {
-        orderBy: { verifiedAt: "desc" },
-        take: 1,
-      },
-      conflictsAsA: {
-        where: { status: "OPEN" },
-      },
-      conflictsAsB: {
-        where: { status: "OPEN" },
-      },
-    },
-  });
+    }),
+    prisma.conflict.count({
+      where: { projectId, status: "OPEN" },
+    }),
+  ]);
 
   const totalClaims = claims.length;
   const pendingClaims = claims.filter((c) => c.reviewState === "PENDING");
   const acceptedClaims = claims.filter((c) => c.reviewState === "ACCEPTED");
   const rejectedClaims = claims.filter((c) => c.reviewState === "REJECTED");
-  const openConflictsCount = await prisma.conflict.count({
-    where: { projectId, status: "OPEN" },
-  });
 
   // Prioritize queue order:
   // 1. Claims in OPEN conflicts first

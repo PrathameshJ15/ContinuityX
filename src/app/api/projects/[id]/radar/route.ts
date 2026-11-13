@@ -8,6 +8,7 @@ interface RouteParams {
 }
 
 export async function GET(req: NextRequest, { params }: RouteParams) {
+  const startTime = performance.now();
   try {
     const user = await getCurrentUser();
     if (!user) throw new UnauthorizedError();
@@ -19,8 +20,15 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 
     const data = await computeRadarAlertsService(projectId, user.id, { ruleId, status });
 
-    return jsonSuccess(data);
+    const duration = performance.now() - startTime;
+    console.log(`[API Timing] GET /api/projects/${projectId}/radar completed in ${duration.toFixed(2)} ms`);
+
+    const response = jsonSuccess(data);
+    response.headers.set("Server-Timing", `total;dur=${duration.toFixed(2)}`);
+    return response;
   } catch (err: unknown) {
+    const duration = performance.now() - startTime;
+    console.log(`[API Timing] GET /api/projects/radar failed after ${duration.toFixed(2)} ms`);
     return handleApiError(err);
   }
 }
