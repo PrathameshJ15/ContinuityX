@@ -149,8 +149,8 @@ export async function askHandoverQuestionService(
       const entityAliases = claim.subjectEntity.aliases.map((a) => a.alias.toLowerCase());
       const valueRawLower = claim.valueRaw.toLowerCase();
       const valueNormLower = (claim.valueNormalized || "").toLowerCase();
-      const categoryLower = claim.category.toLowerCase();
-      const attributeKeyLower = claim.attributeKey.toLowerCase();
+      const categoryLower = (claim.category ?? "").toLowerCase();
+      const attributeKeyLower = (claim.attributeKey ?? "").toLowerCase();
 
       // Entity match
       if (questionLower.includes(entityName)) {
