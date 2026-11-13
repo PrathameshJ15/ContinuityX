@@ -83,7 +83,7 @@ ContinuityX is a Proof-Carrying Project Knowledge and Handover Intelligence Plat
 
 ## Benchmark Results (Summary)
 
-Evaluated against N=40 labeled claims, N=10 conflicts, N=6 hallucination traps, and N=2 prompt injections across DEV ("Smart Attendance System") and held-out TEST ("Campus Delivery Drone Navigation System"). Ground-truth labels were authored and frozen in `demo-data/dev/ground_truth.json` and `demo-data/test/ground_truth.json`.
+Evaluated against N=40 labeled claims, N=10 conflicts, N=6 hallucination traps, and N=2 prompt injections across DEV ("Smart Attendance System", N=15) and TEST ("Campus Delivery Drone Navigation System", N=25). Ground-truth labels and evaluation results were committed together in commit `23d55c9`, so label freezing before the run cannot be demonstrated from git history. The ground-truth labels were authored by the development team using an AI coding assistant (`autonomous` per `DECISIONS.md`); labels were not independently reviewed. In addition, claims in the seeded demo project were approved programmatically in bulk using `scripts/approve_project_claims.ts` rather than individually reviewed and approved through the reviewer cockpit UI.
 
 ### Baseline Configuration
 - **Baseline Prompt:** *"Analyse supplied project documents; produce a structured project summary; identify decisions, tasks, owners and risks; cite supporting source documents and locations; explicitly list contradictions and inconsistencies."*
@@ -111,7 +111,7 @@ Full comparative evaluation report: [benchmark-report.md](benchmark/results/benc
 
 ### Methodological Limitations
 1. **Small Sample Size:** Evaluated on N=40 labeled claims, N=10 conflicts, N=6 planted traps, and N=2 prompt injections.
-2. **Author-Written Synthetic Data:** Test documents and ground-truth labels were authored by the project developers, which may unintentionally align with modeled entity structures.
+2. **Author-Written Synthetic Data & Unverified Label Freezing:** Test documents and ground-truth labels were authored by the development team with an AI coding assistant and were not independently reviewed. Because TEST labels and results were committed together in `23d55c9`, independent label freezing before the evaluation run cannot be demonstrated from repository history. Furthermore, seeded demo claims were approved programmatically by script (`scripts/approve_project_claims.ts`) rather than through live manual reviewer cockpit interactions.
 3. **Same-Vendor Model Evaluation:** Both extraction and semantic judging rely on Google Gemini models, which could share common reasoning blind spots.
 4. **Simple Baseline:** The naive baseline uses a single zero-shot prompt without multi-step verification or entity normalization.
 
