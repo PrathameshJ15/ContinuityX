@@ -183,7 +183,21 @@ The platform was evaluated against **N=40 labeled claims**, **N=10 planted confl
 
 ## 6. Research and Validation Status
 
-Interview findings: UNKNOWN: team to fill with real responses only
+Research and validation status
+
+Interview findings: We collected 1 response from a short, consented three-question written interview with a senior software engineer who has experience both taking over and handing over project work. The respondent agreed to anonymous paraphrasing. Date: 12 November 2026.
+
+This is a very small sample. It is early qualitative input that is consistent with our problem hypothesis. It does not validate the product or show how widespread the problem is.
+
+Paraphrased findings:
+- The hardest part of taking over work was understanding the context behind decisions: what was completed, what is pending, why approaches were chosen, and whether issues remain unresolved. Documentation often described what was built but not why.
+- Important information was scattered across code repositories, README files, project documents, task boards, chat conversations, and sometimes only in the previous developer's head. The respondent described the lack of a single reliable source of truth.
+- Conditions for trusting an automated handover: references to original sources for important claims; accurate status, ownership, dependencies and pending work; transparency about missing, outdated or conflicting information; human review and approval; and access controls for sensitive project information.
+- The respondent said evidence matters more than assumptions, and that a handover should help the next person know what to do next.
+
+Not covered by this response: how long it took to understand unfinished work, and whether the respondent would want source links for every statement. We make no claim about these.
+
+Next step: we plan to interview more people (target 5 to 8, not guaranteed) and will report counts and paraphrased themes only.
 
 ---
 
