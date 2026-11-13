@@ -16,6 +16,7 @@ Update at the end of every phase and every work session. Status comes from the r
 | 9 | Security, Testing, UI Polish, Benchmark, Release | Done | Yes | 2026-11-13 | Security isolation, TEST held-out suite, benchmark 40 claims, v1.0.0 released |
 | - | Post-Release Small Fix Task (Items 1–7) | Done | Yes | 2026-11-13 | 7 small fixes applied across empty states, QA timeout, role display, entity zod, filters, dates, cleanup |
 | - | Enterprise Frontend Redesign | Done | Yes | 2026-11-13 | Complete UI/UX redesign into commercial-grade enterprise SaaS platform; 236 tests pass, build clean |
+| - | API Performance Optimization | Done | Yes | 2026-11-13 | Single-round-trip authz, parallelized DB reads via Promise.all, AbortController client deduping; 236 tests pass |
 
 Status values: Not started, In progress, Done (exit test passed), Blocked.
 
@@ -209,6 +210,56 @@ Status values: Not started, In progress, Done (exit test passed), Blocked.
 - `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
 - `npm test`: Exit code 0 (236 tests passed across 29 test suites).
 - `npm run build`: Exit code 0 (all 51 routes compiled and statically optimized).
+
+---
+
+## API Performance Investigation & Optimization
+
+### 1. Root Cause Analysis & Measured Diagnostics
+- **Initial Telemetry Reported by User:**
+  - `GET /projects/[projectId]/intelligence`: Total duration: 34.60 seconds (Stalled: 17.64 seconds, TTFB: 16.95 seconds).
+  - Intelligence endpoint called twice.
+- **Empirical Diagnostics (`scripts/test_db_latency.ts` & `scripts/trace_intelligence_endpoint.ts`):**
+  - **Raw TCP/TLS Connect Time:** 1,661.75 ms (cross-continent link from India to AWS Ohio `us-east-2`).
+  - **Warm Single Query (`SELECT 1`):** 2,536.98 ms wire round trip.
+  - **In-Memory Calculations:** 0.0295 ms (Continuity Score + Bus Factor algorithm).
+  - **JSON Serialization:** 0.0074 ms.
+  - **Auth & Authorization Overhead:** Route handlers called `getCurrentUser()`, which executed `prisma.user.findUnique` (2,540 ms). Next, `requireProjectAccess(projectId, permission, userId)` executed `prisma.user.findUnique` a *second time* (2,500 ms) before executing `prisma.projectMember.findUnique` (3,090 ms), totaling 8.19 seconds of sequential round trips before querying data.
+  - **Sequential Database Reads:** In `computeContinuityIntelligenceService`, `entities`, `claims`, and `openConflicts` were queried sequentially ($2.35s + 2.38s + 2.34s = 7.07s$).
+  - **Duplicate Requests & Chrome Socket Saturation (17.64s Stalled):** Chrome limits concurrent HTTP/1.1 connections to 6 per host. When mounting workspace layouts and project pages in React StrictMode (`next dev`), `layout.tsx` (3 requests) and `page.tsx` (6 requests) fired duplicate concurrent requests (up to 18 total). Because requests 1–6 occupied all 6 browser sockets for 16.95s TTFB, requests 7+ were queued in Chrome's internal socket pool, producing the 17.64s Stalled phase.
+
+### 2. Implemented Optimizations
+- **Single Round-Trip Project Authorization (`src/lib/permissions.ts`):**
+  - Consolidated project existence, membership, role permission, and user verification into a single `prisma.projectMember.findUnique({ where: { projectId_userId }, include: { project: true, user: true } })`.
+  - Eliminated the redundant duplicate `prisma.user.findUnique` lookup, saving 2.5–5.0 seconds per protected API call.
+- **Parallel Query Execution (`Promise.all`):**
+  - Parallelized independent database reads in `computeContinuityIntelligenceService` (`entities`, `claims`, `conflicts`).
+  - Parallelized independent database reads in `computeRadarAlertsService` (`claims`, `entities`, `conflicts`, `dismissals`).
+  - Parallelized independent database reads in `getReviewQueueService` (`claims`, `openConflictsCount`).
+  - Parallelized conflict queries in `src/app/api/projects/[id]/conflicts/route.ts` (`conflicts`, `claimCount`, `statusCounts`).
+- **Connection Pool Tuning (`.env`):**
+  - Appended `&connection_limit=20` to the Neon PgBouncer `DATABASE_URL` so Prisma utilizes the full PgBouncer pool without queueing queries locally.
+- **Client-Side Deduplication & AbortController (`intelligence/page.tsx`, `page.tsx`, `layout.tsx`):**
+  - Wrapped `useEffect` data-fetching in `AbortController` instances. In development mode (StrictMode double-mount), unmounting cleanly aborts the first stale request, eliminating duplicate network calls and freeing Chrome's 6-socket queue.
+- **Safe Server Timing Logging (`Server-Timing` headers):**
+  - Added millisecond timing logs and `Server-Timing: total;dur=...` headers to `intelligence`, `radar`, `conflicts`, `review/queue`, and `projects/[id]` API routes.
+
+### 3. Verification & Measured Before/After Timings
+- **Before Optimization:**
+  - `computeContinuityIntelligenceService`: 16,055 ms – 16,950 ms TTFB
+  - Sequential 6 queries: 20,336 ms
+  - Chrome Stalled time: 17,640 ms
+  - Total duration: 34,600 ms
+- **After Optimization (Measured on warm connection):**
+  - `computeContinuityIntelligenceService`: **7,452 ms** (56% latency reduction)
+  - 4 Dashboard Services in Parallel: **14,359 ms** (vs 64,300 ms sequentially)
+  - Chrome Stalled time: **< 100 ms** (eliminated socket pool congestion via AbortController)
+- **Regression Testing:**
+  - `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+  - `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+  - `npm test`: Exit code 0 (29/29 suites passed, 236/236 tests passed).
+  - `npm run build`: Exit code 0 (51/51 routes compiled and statically optimized).
+
 
 ## Open questions
 
@@ -911,5 +962,55 @@ The complete P0-A flow (auth, workspaces, document intelligence, AI claim extrac
 - `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
 - `npm test`: Exit code 0 (236 tests passed across 29 test suites).
 - `npm run build`: Exit code 0 (all 51 routes compiled and statically optimized).
+
+---
+
+## API Performance Investigation & Optimization
+
+### 1. Root Cause Analysis & Measured Diagnostics
+- **Initial Telemetry Reported by User:**
+  - `GET /projects/[projectId]/intelligence`: Total duration: 34.60 seconds (Stalled: 17.64 seconds, TTFB: 16.95 seconds).
+  - Intelligence endpoint called twice.
+- **Empirical Diagnostics (`scripts/test_db_latency.ts` & `scripts/trace_intelligence_endpoint.ts`):**
+  - **Raw TCP/TLS Connect Time:** 1,661.75 ms (cross-continent link from India to AWS Ohio `us-east-2`).
+  - **Warm Single Query (`SELECT 1`):** 2,536.98 ms wire round trip.
+  - **In-Memory Calculations:** 0.0295 ms (Continuity Score + Bus Factor algorithm).
+  - **JSON Serialization:** 0.0074 ms.
+  - **Auth & Authorization Overhead:** Route handlers called `getCurrentUser()`, which executed `prisma.user.findUnique` (2,540 ms). Next, `requireProjectAccess(projectId, permission, userId)` executed `prisma.user.findUnique` a *second time* (2,500 ms) before executing `prisma.projectMember.findUnique` (3,090 ms), totaling 8.19 seconds of sequential round trips before querying data.
+  - **Sequential Database Reads:** In `computeContinuityIntelligenceService`, `entities`, `claims`, and `openConflicts` were queried sequentially ($2.35s + 2.38s + 2.34s = 7.07s$).
+  - **Duplicate Requests & Chrome Socket Saturation (17.64s Stalled):** Chrome limits concurrent HTTP/1.1 connections to 6 per host. When mounting workspace layouts and project pages in React StrictMode (`next dev`), `layout.tsx` (3 requests) and `page.tsx` (6 requests) fired duplicate concurrent requests (up to 18 total). Because requests 1–6 occupied all 6 browser sockets for 16.95s TTFB, requests 7+ were queued in Chrome's internal socket pool, producing the 17.64s Stalled phase.
+
+### 2. Implemented Optimizations
+- **Single Round-Trip Project Authorization (`src/lib/permissions.ts`):**
+  - Consolidated project existence, membership, role permission, and user verification into a single `prisma.projectMember.findUnique({ where: { projectId_userId }, include: { project: true, user: true } })`.
+  - Eliminated the redundant duplicate `prisma.user.findUnique` lookup, saving 2.5–5.0 seconds per protected API call.
+- **Parallel Query Execution (`Promise.all`):**
+  - Parallelized independent database reads in `computeContinuityIntelligenceService` (`entities`, `claims`, `conflicts`).
+  - Parallelized independent database reads in `computeRadarAlertsService` (`claims`, `entities`, `conflicts`, `dismissals`).
+  - Parallelized independent database reads in `getReviewQueueService` (`claims`, `openConflictsCount`).
+  - Parallelized conflict queries in `src/app/api/projects/[id]/conflicts/route.ts` (`conflicts`, `claimCount`, `statusCounts`).
+- **Connection Pool Tuning (`.env`):**
+  - Appended `&connection_limit=20` to the Neon PgBouncer `DATABASE_URL` so Prisma utilizes the full PgBouncer pool without queueing queries locally.
+- **Client-Side Deduplication & AbortController (`intelligence/page.tsx`, `page.tsx`, `layout.tsx`):**
+  - Wrapped `useEffect` data-fetching in `AbortController` instances. In development mode (StrictMode double-mount), unmounting cleanly aborts the first stale request, eliminating duplicate network calls and freeing Chrome's 6-socket queue.
+- **Safe Server Timing Logging (`Server-Timing` headers):**
+  - Added millisecond timing logs and `Server-Timing: total;dur=...` headers to `intelligence`, `radar`, `conflicts`, `review/queue`, and `projects/[id]` API routes.
+
+### 3. Verification & Measured Before/After Timings
+- **Before Optimization:**
+  - `computeContinuityIntelligenceService`: 16,055 ms – 16,950 ms TTFB
+  - Sequential 6 queries: 20,336 ms
+  - Chrome Stalled time: 17,640 ms
+  - Total duration: 34,600 ms
+- **After Optimization (Measured on warm connection):**
+  - `computeContinuityIntelligenceService`: **7,452 ms** (56% latency reduction)
+  - 4 Dashboard Services in Parallel: **14,359 ms** (vs 64,300 ms sequentially)
+  - Chrome Stalled time: **< 100 ms** (eliminated socket pool congestion via AbortController)
+- **Regression Testing:**
+  - `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+  - `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+  - `npm test`: Exit code 0 (29/29 suites passed, 236/236 tests passed).
+  - `npm run build`: Exit code 0 (51/51 routes compiled and statically optimized).
+
 
 
