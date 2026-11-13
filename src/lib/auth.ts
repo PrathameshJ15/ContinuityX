@@ -75,12 +75,20 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
     }
 
     // Verify user still exists in database to prevent deleted accounts from accessing resources
-    const user = await prisma.user.findUnique({
-      where: { id: payload.id },
-      select: { id: true, email: true, name: true },
-    });
-
-    return user;
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: payload.id },
+        select: { id: true, email: true, name: true },
+      });
+      return user;
+    } catch {
+      // In transient DB disconnects, preserve verified JWT identity rather than falsifying 401
+      return {
+        id: payload.id,
+        email: payload.email,
+        name: payload.name,
+      };
+    }
   } catch {
     return null;
   }

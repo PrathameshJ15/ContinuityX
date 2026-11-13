@@ -260,6 +260,39 @@ Status values: Not started, In progress, Done (exit test passed), Blocked.
   - `npm test`: Exit code 0 (29/29 suites passed, 236/236 tests passed).
   - `npm run build`: Exit code 0 (51/51 routes compiled and statically optimized).
 
+---
+
+## P0 Incident Resolution: Resilient Workspace Lifecycle & Auth Fallback
+
+### 1. Root Cause Analysis
+- **Premature Abort Early Return in Client Components (`src/app/projects/[projectId]/page.tsx`):**
+  - Following the performance optimization commit (`1d60832`), `loadAllProjectData` contained `if (signal?.aborted) return;`.
+  - In React development mode / StrictMode, effect cleanup called `controller.abort()`. When in-flight promises resolved, the early return prevented state setters (`setProject`, `setIntelligence`, etc.) from running.
+  - In `finally`, `setLoading(false)` ran, leaving `project === null`. Line 266 (`if (!project) return null;`) rendered a blank white page (`null`), causing "no results" on project overview.
+- **Unsettled Workspace Loading in Layout (`src/app/projects/[projectId]/layout.tsx`):**
+  - `loadWorkspaceData` in `layout.tsx` relied on an `isMounted` flag set to `false` during effect cleanup.
+  - In `catch`, `AbortError` was swallowed, and in `finally`, `if (isMounted) setLoading(false)` skipped `setLoading(false)`, leaving the layout stuck on "Loading enterprise project workspace..." or rendering null.
+  - Because `layout.tsx` wraps all project workspace routes, this blocked all 11 sub-pages.
+- **Transient Auth 401 Masking DB Disconnects (`src/lib/auth.ts`):**
+  - In `getCurrentUser()`, if `prisma.user.findUnique` threw during a transient connection reset, `catch { return null; }` caused valid sessions to appear unauthenticated (401), causing client redirects.
+
+### 2. Implemented Fixes
+- **Resilient Data Population (`page.tsx`, `layout.tsx`, `intelligence/page.tsx`):**
+  - Removed premature abort returns that dropped settled responses. Settled data is always applied when available, and loading state is reliably cleared in `finally`.
+  - Removed `router` dependency from `layout.tsx`'s `useEffect` dependency array, preventing spurious re-render abort loops.
+  - Added a visible retry fallback in `page.tsx` if `project` is null, preventing blank white screens.
+- **Resilient Auth Session Fallback (`src/lib/auth.ts`):**
+  - When JWT verification succeeds but the database experiences a transient connection timeout, `getCurrentUser()` preserves the authenticated user from the cryptographically verified JWT payload rather than falsifying an unauthenticated 401 error.
+- **Pool Connection Tuning (`.env`):**
+  - Set `&connection_limit=10` and removed unsupported `channel_binding=require` on PgBouncer `DATABASE_URL` to prevent handshake resets.
+
+### 3. Verification & Quality Gate Results
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm test`: Exit code 0 (29/29 suites passed, 236/236 tests passed).
+- `npm run build`: Exit code 0 (all 51 routes compiled and optimized cleanly).
+
+
 
 ## Open questions
 
@@ -1011,6 +1044,39 @@ The complete P0-A flow (auth, workspaces, document intelligence, AI claim extrac
   - `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
   - `npm test`: Exit code 0 (29/29 suites passed, 236/236 tests passed).
   - `npm run build`: Exit code 0 (51/51 routes compiled and statically optimized).
+
+---
+
+## P0 Incident Resolution: Resilient Workspace Lifecycle & Auth Fallback
+
+### 1. Root Cause Analysis
+- **Premature Abort Early Return in Client Components (`src/app/projects/[projectId]/page.tsx`):**
+  - Following the performance optimization commit (`1d60832`), `loadAllProjectData` contained `if (signal?.aborted) return;`.
+  - In React development mode / StrictMode, effect cleanup called `controller.abort()`. When in-flight promises resolved, the early return prevented state setters (`setProject`, `setIntelligence`, etc.) from running.
+  - In `finally`, `setLoading(false)` ran, leaving `project === null`. Line 266 (`if (!project) return null;`) rendered a blank white page (`null`), causing "no results" on project overview.
+- **Unsettled Workspace Loading in Layout (`src/app/projects/[projectId]/layout.tsx`):**
+  - `loadWorkspaceData` in `layout.tsx` relied on an `isMounted` flag set to `false` during effect cleanup.
+  - In `catch`, `AbortError` was swallowed, and in `finally`, `if (isMounted) setLoading(false)` skipped `setLoading(false)`, leaving the layout stuck on "Loading enterprise project workspace..." or rendering null.
+  - Because `layout.tsx` wraps all project workspace routes, this blocked all 11 sub-pages.
+- **Transient Auth 401 Masking DB Disconnects (`src/lib/auth.ts`):**
+  - In `getCurrentUser()`, if `prisma.user.findUnique` threw during a transient connection reset, `catch { return null; }` caused valid sessions to appear unauthenticated (401), causing client redirects.
+
+### 2. Implemented Fixes
+- **Resilient Data Population (`page.tsx`, `layout.tsx`, `intelligence/page.tsx`):**
+  - Removed premature abort returns that dropped settled responses. Settled data is always applied when available, and loading state is reliably cleared in `finally`.
+  - Removed `router` dependency from `layout.tsx`'s `useEffect` dependency array, preventing spurious re-render abort loops.
+  - Added a visible retry fallback in `page.tsx` if `project` is null, preventing blank white screens.
+- **Resilient Auth Session Fallback (`src/lib/auth.ts`):**
+  - When JWT verification succeeds but the database experiences a transient connection timeout, `getCurrentUser()` preserves the authenticated user from the cryptographically verified JWT payload rather than falsifying an unauthenticated 401 error.
+- **Pool Connection Tuning (`.env`):**
+  - Set `&connection_limit=10` and removed unsupported `channel_binding=require` on PgBouncer `DATABASE_URL` to prevent handshake resets.
+
+### 3. Verification & Quality Gate Results
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` clean, 0 errors).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm test`: Exit code 0 (29/29 suites passed, 236/236 tests passed).
+- `npm run build`: Exit code 0 (all 51 routes compiled and optimized cleanly).
+
 
 
 

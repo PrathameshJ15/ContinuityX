@@ -137,7 +137,7 @@ export default function ProjectOverviewPage({
   const [reviewQueueData, setReviewQueueData] = useState<ReviewQueueData | null>(null);
   const [documentsData, setDocumentsData] = useState<DocumentItem[]>([]);
 
-  const loadAllProjectData = useCallback(async (signal?: AbortSignal) => {
+  const loadAllProjectData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -149,15 +149,13 @@ export default function ProjectOverviewPage({
         reviewRes,
         docsRes,
       ] = await Promise.allSettled([
-        fetch(`/api/projects/${projectId}`, { signal }),
-        fetch(`/api/projects/${projectId}/intelligence`, { signal }),
-        fetch(`/api/projects/${projectId}/radar`, { signal }),
-        fetch(`/api/projects/${projectId}/conflicts`, { signal }),
-        fetch(`/api/projects/${projectId}/review/queue`, { signal }),
-        fetch(`/api/projects/${projectId}/documents`, { signal }),
+        fetch(`/api/projects/${projectId}`),
+        fetch(`/api/projects/${projectId}/intelligence`),
+        fetch(`/api/projects/${projectId}/radar`),
+        fetch(`/api/projects/${projectId}/conflicts`),
+        fetch(`/api/projects/${projectId}/review/queue`),
+        fetch(`/api/projects/${projectId}/documents`),
       ]);
-
-      if (signal?.aborted) return;
 
       if (projRes.status === "fulfilled" && projRes.value.ok) {
         const pJson = await projRes.value.json();
@@ -200,12 +198,7 @@ export default function ProjectOverviewPage({
   }, [projectId]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    loadAllProjectData(controller.signal);
-
-    return () => {
-      controller.abort();
-    };
+    loadAllProjectData();
   }, [loadAllProjectData]);
 
   async function handleUpdate(e: React.FormEvent) {
@@ -263,7 +256,19 @@ export default function ProjectOverviewPage({
     );
   }
 
-  if (!project) return null;
+  if (!project) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center text-muted-foreground space-y-3">
+        <p className="text-sm font-medium">Unable to load project workspace.</p>
+        <button
+          onClick={() => loadAllProjectData()}
+          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow hover:bg-primary/90 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   const isOwner = project.currentUserRole === "OWNER";
 

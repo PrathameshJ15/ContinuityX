@@ -40,16 +40,15 @@ export default function ProjectWorkspaceLayout({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
     let isMounted = true;
 
     async function loadWorkspaceData() {
       try {
         setLoading(true);
         const [projRes, projectsRes, meRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}`, { signal: controller.signal }),
-          fetch("/api/projects", { signal: controller.signal }),
-          fetch("/api/auth/me", { signal: controller.signal }),
+          fetch(`/api/projects/${projectId}`),
+          fetch("/api/projects"),
+          fetch("/api/auth/me"),
         ]);
 
         if (projRes.status === 401) {
@@ -84,7 +83,6 @@ export default function ProjectWorkspaceLayout({
           }
         }
       } catch (err: unknown) {
-        if (err instanceof Error && err.name === "AbortError") return;
         if (isMounted) {
           setErrorStatus(500);
           setErrorMessage(err instanceof Error ? err.message : "Network error");
@@ -100,9 +98,9 @@ export default function ProjectWorkspaceLayout({
 
     return () => {
       isMounted = false;
-      controller.abort();
     };
-  }, [projectId, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   if (loading) {
     return (

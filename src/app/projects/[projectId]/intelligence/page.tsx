@@ -109,19 +109,18 @@ export default function ContinuityIntelligencePage({
     },
   ]);
 
-  const loadIntelligence = useCallback(async (signal?: AbortSignal) => {
+  const loadIntelligence = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`/api/projects/${projectId}/intelligence`, { signal });
+      const res = await fetch(`/api/projects/${projectId}/intelligence`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Failed to load continuity intelligence");
 
       setScoreData(json.data.score);
       setBusFactorData(json.data.busFactor);
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to load intelligence data");
     } finally {
       setLoading(false);
@@ -129,12 +128,7 @@ export default function ContinuityIntelligencePage({
   }, [projectId]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    loadIntelligence(controller.signal);
-
-    return () => {
-      controller.abort();
-    };
+    loadIntelligence();
   }, [loadIntelligence]);
 
   const handleAskQuestion = async (qText?: string) => {
