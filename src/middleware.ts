@@ -16,6 +16,9 @@ export function middleware(request: NextRequest) {
     request.headers.get("x-forwarded-proto") === "https"
   ) {
     response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  } else {
+    // Clear any accidental localhost HSTS cache in browsers
+    response.headers.set("Strict-Transport-Security", "max-age=0");
   }
 
   return response;
