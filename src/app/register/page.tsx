@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Logo } from "@/components/ui/logo";
+import { GoogleIcon, GitHubIcon } from "@/components/ui/oauth-icons";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -17,6 +18,16 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlError = urlParams.get("error");
+      if (urlError) {
+        setError(urlError);
+      }
+    }
+  }, []);
 
   // Live password validation
   const hasMinLength = password.length >= 8;
@@ -103,6 +114,33 @@ export default function RegisterPage() {
               <span>{error}</span>
             </div>
           )}
+
+          {/* Social OAuth Sign Up Buttons */}
+          <div className="space-y-2.5">
+            <a
+              href="/api/auth/oauth/google"
+              className="flex items-center justify-center gap-3 w-full min-h-[44px] px-4 rounded-lg border border-line bg-card hover:bg-soft-section dark:hover:bg-[#161f36] text-[14px] font-heading font-semibold text-ink transition-colors shadow-sm select-none"
+            >
+              <GoogleIcon className="h-5 w-5 shrink-0" />
+              <span>Continue with Google</span>
+            </a>
+
+            <a
+              href="/api/auth/oauth/github"
+              className="flex items-center justify-center gap-3 w-full min-h-[44px] px-4 rounded-lg border border-line bg-card hover:bg-soft-section dark:hover:bg-[#161f36] text-[14px] font-heading font-semibold text-ink transition-colors shadow-sm select-none"
+            >
+              <GitHubIcon className="h-5 w-5 shrink-0" />
+              <span>Continue with GitHub</span>
+            </a>
+          </div>
+
+          {/* Divider between OAuth and Email/Password */}
+          <div className="relative flex items-center justify-center py-1">
+            <div className="w-full border-t border-line" />
+            <span className="absolute bg-card px-3 text-[12px] font-mono text-muted uppercase tracking-wider">
+              Or register with email
+            </span>
+          </div>
 
           {/* Form */}
           <form onSubmit={handleRegister} className="space-y-4">

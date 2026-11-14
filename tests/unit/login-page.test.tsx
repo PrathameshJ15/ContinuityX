@@ -37,6 +37,15 @@ describe("LoginPage Component", () => {
     expect(screen.getByText("Forgot password?")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Create account" }).length).toBeGreaterThanOrEqual(1);
 
+    // OAuth buttons
+    const googleBtn = screen.getByRole("link", { name: /Continue with Google/i });
+    expect(googleBtn).toBeInTheDocument();
+    expect(googleBtn).toHaveAttribute("href", "/api/auth/oauth/google");
+
+    const githubBtn = screen.getByRole("link", { name: /Continue with GitHub/i });
+    expect(githubBtn).toBeInTheDocument();
+    expect(githubBtn).toHaveAttribute("href", "/api/auth/oauth/github");
+
     // Narrative and proof chain on left side
     expect(screen.getByText(/Your project knowledge,/i)).toBeInTheDocument();
     expect(screen.getByText("Traceable Evidence Chain")).toBeInTheDocument();

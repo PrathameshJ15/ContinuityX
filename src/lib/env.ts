@@ -23,6 +23,11 @@ const envSchema = z.object({
     .string()
     .min(16, "NEXTAUTH_SECRET must be at least 16 characters")
     .default("continuityx-default-development-secret-key-32b"),
+  AUTH_SECRET: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
   GROQ_API_KEY: z.string().optional(),
   GROQ_EXTRACTION_MODEL: z.string().default("openai/gpt-oss-120b"),
   GROQ_VERIFICATION_MODEL: z.string().default("openai/gpt-oss-20b"),

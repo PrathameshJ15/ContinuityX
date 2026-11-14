@@ -6,10 +6,11 @@ import { prisma } from "@/lib/db";
 import { AuthenticatedUser } from "@/lib/permissions";
 
 export const SESSION_COOKIE_NAME = "continuityx_session";
-const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
+export const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 
-function getSecretKey(): Uint8Array {
-  return new Uint8Array(Buffer.from(env.NEXTAUTH_SECRET, "utf-8"));
+export function getSecretKey(): Uint8Array {
+  const secret = process.env.AUTH_SECRET || env.NEXTAUTH_SECRET;
+  return new Uint8Array(Buffer.from(secret, "utf-8"));
 }
 
 export async function hashPassword(password: string): Promise<string> {

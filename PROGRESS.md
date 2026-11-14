@@ -335,6 +335,46 @@ Status values: Not started, In progress, Done (exit test passed), Blocked.
   - `npm test`: Exit code 0 (33/33 test files passed, 260/260 tests passed).
   - `npm run build`: Exit code 0 (all 54 routes compiled and statically optimized with Next.js Middleware).
 
+---
+
+## Milestone: Enterprise Brand Identity, Social OAuth (Google & GitHub) & Premium Auth Overhaul
+
+### 1. What was built & delivered
+- **ContinuityX Brand Identity & SVG Assets (`public/assets/`, `src/components/ui/logo.tsx`):**
+  - Designed official geometric "X" constellation network logo representing connected project knowledge, verified evidence, and seamless team handovers.
+  - Exported production SVGs:
+    - `public/assets/continuityx-symbol.svg`
+    - `public/assets/continuityx-symbol-light.svg`
+    - `public/assets/continuityx-symbol-dark.svg`
+    - `public/assets/continuityx-logo-light.svg`
+    - `public/assets/continuityx-logo-dark.svg`
+    - `public/favicon.svg`
+  - Reusable React `Logo` component (`src/components/ui/logo.tsx`) with variant (`symbol` vs `full`), size, and theme token styling.
+- **Social OAuth 2.0 Authentication Engine (`src/lib/oauth.ts`, `src/app/api/auth/`):**
+  - Implemented RFC-compliant OAuth 2.0 with cryptographic state cookies to defend against CSRF attacks.
+  - Endpoints:
+    - `GET /api/auth/oauth/google`: Redirects to Google OAuth consent screen with secure state.
+    - `GET /api/auth/oauth/github`: Redirects to GitHub OAuth authorize with secure state.
+    - `GET /api/auth/callback/google`: Exchanges authorization code, retrieves verified Google profile, upserts user, and issues 7-day JWT session cookie.
+    - `GET /api/auth/callback/github`: Exchanges authorization code, queries GitHub API (including primary verified email), upserts user, and issues 7-day JWT session cookie.
+    - Graceful error redirection to `/login?error=...` if credentials are unconfigured or user denies permission.
+- **Premium Login & Register Experiences (`src/app/login/page.tsx`, `src/app/register/page.tsx`):**
+  - Two-column enterprise SaaS layout on desktop; single-column fluid layout on mobile (320px+).
+  - Left panel: ContinuityX brand logo, enterprise value proposition, and interactive 4-gate verification evidence proof card.
+  - Right panel: One-click "Continue with Google" and "Continue with GitHub" buttons, subtle divider, credential form, show/hide password toggle, and synthetic demo quick-fill presets.
+- **Comprehensive Unit & Integration Test Coverage:**
+  - `tests/unit/oauth.test.ts`: URL generation, state validation, and authorization handling.
+  - `tests/integration/oauth-routes.test.ts`: Google and GitHub route redirects, missing configuration handling, and callback error traps.
+  - `tests/unit/logo.test.tsx`: Logo sizing, symbol vs full wordmark, and theme classes.
+  - `tests/unit/login-page.test.tsx`: Updated with OAuth button assertions and responsive accessibility checks.
+
+### 2. Verification Summary
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` 0 errors).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm test`: Exit code 0 (**35 test files passed, 281/281 tests passed**).
+- `npm run build`: Exit code 0 (All 58 routes compiled and statically optimized).
+
+
 
 
 
@@ -1164,6 +1204,46 @@ The complete P0-A flow (auth, workspaces, document intelligence, AI claim extrac
   - `npm run lint`: Exit code 0 (✔ No ESLint warnings or errors).
   - `npm test`: Exit code 0 (33/33 test files passed, 260/260 tests passed).
   - `npm run build`: Exit code 0 (all 54 routes compiled and statically optimized with Next.js Middleware).
+
+---
+
+## Milestone: Enterprise Brand Identity, Social OAuth (Google & GitHub) & Premium Auth Overhaul
+
+### 1. What was built & delivered
+- **ContinuityX Brand Identity & SVG Assets (`public/assets/`, `src/components/ui/logo.tsx`):**
+  - Designed official geometric "X" constellation network logo representing connected project knowledge, verified evidence, and seamless team handovers.
+  - Exported production SVGs:
+    - `public/assets/continuityx-symbol.svg`
+    - `public/assets/continuityx-symbol-light.svg`
+    - `public/assets/continuityx-symbol-dark.svg`
+    - `public/assets/continuityx-logo-light.svg`
+    - `public/assets/continuityx-logo-dark.svg`
+    - `public/favicon.svg`
+  - Reusable React `Logo` component (`src/components/ui/logo.tsx`) with variant (`symbol` vs `full`), size, and theme token styling.
+- **Social OAuth 2.0 Authentication Engine (`src/lib/oauth.ts`, `src/app/api/auth/`):**
+  - Implemented RFC-compliant OAuth 2.0 with cryptographic state cookies to defend against CSRF attacks.
+  - Endpoints:
+    - `GET /api/auth/oauth/google`: Redirects to Google OAuth consent screen with secure state.
+    - `GET /api/auth/oauth/github`: Redirects to GitHub OAuth authorize with secure state.
+    - `GET /api/auth/callback/google`: Exchanges authorization code, retrieves verified Google profile, upserts user, and issues 7-day JWT session cookie.
+    - `GET /api/auth/callback/github`: Exchanges authorization code, queries GitHub API (including primary verified email), upserts user, and issues 7-day JWT session cookie.
+    - Graceful error redirection to `/login?error=...` if credentials are unconfigured or user denies permission.
+- **Premium Login & Register Experiences (`src/app/login/page.tsx`, `src/app/register/page.tsx`):**
+  - Two-column enterprise SaaS layout on desktop; single-column fluid layout on mobile (320px+).
+  - Left panel: ContinuityX brand logo, enterprise value proposition, and interactive 4-gate verification evidence proof card.
+  - Right panel: One-click "Continue with Google" and "Continue with GitHub" buttons, subtle divider, credential form, show/hide password toggle, and synthetic demo quick-fill presets.
+- **Comprehensive Unit & Integration Test Coverage:**
+  - `tests/unit/oauth.test.ts`: URL generation, state validation, and authorization handling.
+  - `tests/integration/oauth-routes.test.ts`: Google and GitHub route redirects, missing configuration handling, and callback error traps.
+  - `tests/unit/logo.test.tsx`: Logo sizing, symbol vs full wordmark, and theme classes.
+  - `tests/unit/login-page.test.tsx`: Updated with OAuth button assertions and responsive accessibility checks.
+
+### 2. Verification Summary
+- `npm run typecheck`: Exit code 0 (`tsc --noEmit` 0 errors).
+- `npm run lint`: Exit code 0 (`✔ No ESLint warnings or errors`).
+- `npm test`: Exit code 0 (**35 test files passed, 281/281 tests passed**).
+- `npm run build`: Exit code 0 (All 58 routes compiled and statically optimized).
+
 
 
 
