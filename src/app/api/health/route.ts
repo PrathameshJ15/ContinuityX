@@ -15,7 +15,12 @@ export async function GET() {
   } catch (error) {
     dbStatus = "disconnected";
     // Never expose database credentials, hostnames, or raw error messages
-    console.error("[HealthCheck] Database connection check failed:", error instanceof Error ? error.message : "Unknown error");
+    const rawMsg = error instanceof Error ? error.message : "Unknown error";
+    const sanitizedMsg = rawMsg
+      .replace(/password\s*=\s*[^\s;]+/gi, "password=[REDACTED]")
+      .replace(/postgres(ql)?:\/\/[^@]+@/gi, "postgresql://[REDACTED]@")
+      .replace(/[A-Za-z]:\\[^\s]+/g, "[path]");
+    console.error("[HealthCheck] Database connection check failed:", sanitizedMsg);
   }
 
   const responseTimeMs = Date.now() - startTime;

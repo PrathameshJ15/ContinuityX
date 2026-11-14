@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { uploadDocumentService } from "@/services/documents";
 import { jsonSuccess, jsonError, handleApiError } from "@/lib/api-response";
+import { checkRateLimit } from "@/lib/rate-limiter";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,17 @@ export async function POST(
 ) {
   try {
     const { id: projectId } = await params;
+
+    // Rate limiting: max 15 document uploads per 60 seconds per project
+    const rateLimit = checkRateLimit(`upload_${projectId}`, 15, 60000);
+    if (!rateLimit.allowed) {
+      return jsonError(
+        "RATE_LIMITED",
+        `Upload rate limit reached for this project. Please wait ${rateLimit.resetInSeconds} seconds before uploading more documents.`,
+        429
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file");
 

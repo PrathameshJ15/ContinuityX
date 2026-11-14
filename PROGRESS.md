@@ -277,7 +277,32 @@ Status values: Not started, In progress, Done (exit test passed), Blocked.
   - `npm run typecheck`: Exit code 0 (0 errors).
   - `npm run lint`: Exit code 0 (✔ No ESLint warnings or errors).
   - `npm test`: Exit code 0 (33 passed test suites, 260/260 tests passed).
-  - `npm run build`: Exit code 0 (all 54 routes compiled and statically optimized).
+  ---
+
+## Milestone: Enterprise Security Hardening & Rate Limiting
+
+### 1. Summary of Changes
+- **Global HTTP Security Headers (`src/middleware.ts`):**
+  - Enforced enterprise headers across all routes and API endpoints:
+    - `X-Frame-Options: DENY` (prevents Clickjacking and unauthorized framing)
+    - `X-Content-Type-Options: nosniff` (prevents MIME type sniffing)
+    - `Referrer-Policy: strict-origin-when-cross-origin` (prevents cross-origin referrer leaks)
+    - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` (HSTS)
+    - `Permissions-Policy: camera=(), microphone=(), geolocation=(), browsing-topics=()`
+    - `X-XSS-Protection: 1; mode=block`
+    - `X-DNS-Prefetch-Control: on`
+- **Application-Wide Endpoint Rate Limiting:**
+  - **User Registration (`/api/auth/register`):** Sliding window limit of 5 registration attempts per 60 seconds per IP with audit logging of rate-limited events.
+  - **AI Handover Q&A (`/api/projects/[id]/qa`):** Sliding window limit of 20 queries per 60 seconds per user/project to prevent LLM quota exhaustion and API abuse.
+  - **Document Upload (`/api/projects/[id]/documents/upload`):** Sliding window limit of 15 uploads per 60 seconds per project to prevent storage and CPU starvation.
+- **Log Secret Sanitization (`src/app/api/health/route.ts`):**
+  - Sanitized database connection error logging to redact database passwords, connection strings, and local file paths before writing to server console/logs.
+- **Verification Gates:**
+  - `npm run typecheck`: Exit code 0 (0 errors).
+  - `npm run lint`: Exit code 0 (✔ No ESLint warnings or errors).
+  - `npm test`: Exit code 0 (33/33 test files passed, 260/260 tests passed).
+  - `npm run build`: Exit code 0 (all 54 routes compiled and statically optimized with Next.js Middleware).
+
 
 
 
@@ -1050,7 +1075,32 @@ The complete P0-A flow (auth, workspaces, document intelligence, AI claim extrac
   - `npm run typecheck`: Exit code 0 (0 errors).
   - `npm run lint`: Exit code 0 (✔ No ESLint warnings or errors).
   - `npm test`: Exit code 0 (33 passed test suites, 260/260 tests passed).
-  - `npm run build`: Exit code 0 (all 54 routes compiled and statically optimized).
+  ---
+
+## Milestone: Enterprise Security Hardening & Rate Limiting
+
+### 1. Summary of Changes
+- **Global HTTP Security Headers (`src/middleware.ts`):**
+  - Enforced enterprise headers across all routes and API endpoints:
+    - `X-Frame-Options: DENY` (prevents Clickjacking and unauthorized framing)
+    - `X-Content-Type-Options: nosniff` (prevents MIME type sniffing)
+    - `Referrer-Policy: strict-origin-when-cross-origin` (prevents cross-origin referrer leaks)
+    - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` (HSTS)
+    - `Permissions-Policy: camera=(), microphone=(), geolocation=(), browsing-topics=()`
+    - `X-XSS-Protection: 1; mode=block`
+    - `X-DNS-Prefetch-Control: on`
+- **Application-Wide Endpoint Rate Limiting:**
+  - **User Registration (`/api/auth/register`):** Sliding window limit of 5 registration attempts per 60 seconds per IP with audit logging of rate-limited events.
+  - **AI Handover Q&A (`/api/projects/[id]/qa`):** Sliding window limit of 20 queries per 60 seconds per user/project to prevent LLM quota exhaustion and API abuse.
+  - **Document Upload (`/api/projects/[id]/documents/upload`):** Sliding window limit of 15 uploads per 60 seconds per project to prevent storage and CPU starvation.
+- **Log Secret Sanitization (`src/app/api/health/route.ts`):**
+  - Sanitized database connection error logging to redact database passwords, connection strings, and local file paths before writing to server console/logs.
+- **Verification Gates:**
+  - `npm run typecheck`: Exit code 0 (0 errors).
+  - `npm run lint`: Exit code 0 (✔ No ESLint warnings or errors).
+  - `npm test`: Exit code 0 (33/33 test files passed, 260/260 tests passed).
+  - `npm run build`: Exit code 0 (all 54 routes compiled and statically optimized with Next.js Middleware).
+
 
 
 

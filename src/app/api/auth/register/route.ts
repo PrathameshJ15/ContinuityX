@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword, createSessionToken, setSessionCookie } from "@/lib/auth";
 import { jsonSuccess, jsonError, handleApiError } from "@/lib/api-response";
 import { writeAudit } from "@/lib/audit";
+import { checkRateLimit } from "@/lib/rate-limiter";
 
 const RegisterSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(100),
@@ -13,6 +14,24 @@ const RegisterSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: max 5 registration attempts per 60 seconds per IP
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local_ip";
+    const rateLimit = checkRateLimit(`register_${clientIp}`, 5, 60000);
+    if (!rateLimit.allowed) {
+      await writeAudit({
+        action: "REGISTER_RATE_LIMITED",
+        entityType: "AUTH",
+        entityId: clientIp,
+        metadata: { clientIp, resetInSeconds: rateLimit.resetInSeconds },
+      });
+
+      return jsonError(
+        "RATE_LIMITED",
+        `Too many registration attempts. Please try again in ${rateLimit.resetInSeconds} seconds.`,
+        429
+      );
+    }
+
     const body = await req.json();
     const validated = RegisterSchema.safeParse(body);
 
