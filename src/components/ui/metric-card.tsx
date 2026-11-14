@@ -26,35 +26,50 @@ export function MetricCard({
   className,
   ...props
 }: MetricCardProps) {
+  const dotClasses = {
+    default: "bg-brand",
+    success: "bg-ok",
+    warning: "bg-warn",
+    danger: "bg-bad",
+    info: "bg-brand",
+  };
+
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card p-4 transition-all duration-150 hover:border-border/90 shadow-[0_1px_2px_rgba(0,0,0,0.03)]",
-        variant === "success" && "border-emerald-200/80 bg-emerald-50/20 dark:border-emerald-900/40",
-        variant === "warning" && "border-amber-200/80 bg-amber-50/20 dark:border-amber-900/40",
-        variant === "danger" && "border-rose-200/80 bg-rose-50/20 dark:border-rose-900/40",
-        variant === "info" && "border-primary/20 bg-primary/5",
+        "rounded-xl border border-line bg-card p-5 flex flex-col justify-between transition-colors",
         className
       )}
       {...props}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground truncate">
-          {Icon && <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" />}
-          <span className="truncate">{title}</span>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {Icon ? (
+            <Icon className="h-4 w-4 shrink-0 text-muted" />
+          ) : (
+            <span
+              className={cn("h-2 w-2 rounded-full shrink-0", dotClasses[variant])}
+              aria-hidden="true"
+            />
+          )}
+          <span className="text-[13.5px] font-medium text-muted truncate">
+            {title}
+          </span>
         </div>
         {badge}
       </div>
 
-      <div className="mt-2.5 flex items-baseline justify-between gap-2">
-        <div className="text-2xl font-bold tracking-tight text-foreground">{value}</div>
+      <div className="my-1 flex items-baseline justify-between gap-2">
+        <div className="text-[28px] sm:text-[30px] font-heading font-bold text-ink tracking-tight tabular-nums leading-tight">
+          {value}
+        </div>
         {trend && (
           <span
             className={cn(
-              "text-[11px] font-semibold flex items-center gap-0.5",
-              trend.direction === "up" && "text-emerald-600 dark:text-emerald-400",
-              trend.direction === "down" && "text-rose-600 dark:text-rose-400",
-              trend.direction === "neutral" && "text-muted-foreground"
+              "text-[12px] font-heading font-semibold",
+              trend.direction === "up" && "text-ok",
+              trend.direction === "down" && "text-bad",
+              trend.direction === "neutral" && "text-muted"
             )}
           >
             {trend.label}
@@ -62,7 +77,11 @@ export function MetricCard({
         )}
       </div>
 
-      {subtitle && <div className="mt-1 text-xs text-muted-foreground truncate">{subtitle}</div>}
+      {subtitle && (
+        <div className="text-[13px] text-faint mt-1 leading-snug truncate">
+          {subtitle}
+        </div>
+      )}
     </div>
   );
 }

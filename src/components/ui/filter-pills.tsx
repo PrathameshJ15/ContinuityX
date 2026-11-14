@@ -26,7 +26,7 @@ export function FilterPills<T extends string = string>({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 p-1 rounded-xl border bg-muted/30 text-xs overflow-x-auto max-w-full",
+        "inline-flex items-center gap-1 p-1 rounded-xl border bg-muted/30 text-xs overflow-x-auto max-w-full scrollbar-none",
         className
       )}
     >
@@ -40,8 +40,8 @@ export function FilterPills<T extends string = string>({
             type="button"
             onClick={() => onSelect(option.id)}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg font-medium transition-all whitespace-nowrap select-none",
-              size === "sm" ? "px-2 py-1 text-[11px]" : "px-3 py-1.5 text-xs",
+              "inline-flex items-center gap-1.5 rounded-lg font-medium transition-all whitespace-nowrap select-none min-h-[36px] sm:min-h-[30px]",
+              size === "sm" ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs",
               isSelected
                 ? "bg-card text-foreground font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.06)] border border-border/80"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/60"

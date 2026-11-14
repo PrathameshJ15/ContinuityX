@@ -83,7 +83,9 @@ ContinuityX is a Proof-Carrying Project Knowledge and Handover Intelligence Plat
 
 ## Benchmark Results (Summary)
 
-Evaluated against N=40 labeled claims, N=10 conflicts, N=6 hallucination traps, and N=2 prompt injections across DEV ("Smart Attendance System", N=15) and TEST ("Campus Delivery Drone Navigation System", N=25). Ground-truth labels and evaluation results were committed together in commit `23d55c9`, so label freezing before the run cannot be demonstrated from git history. The ground-truth labels were authored by the development team using an AI coding assistant (`autonomous` per `DECISIONS.md`); labels were not independently reviewed. In addition, claims in the seeded demo project were approved programmatically in bulk using `scripts/approve_project_claims.ts` rather than individually reviewed and approved through the reviewer cockpit UI.
+Evaluated against N=40 labeled claims, N=10 conflicts, N=6 hallucination traps, and N=2 prompt injections across DEV ("Smart Attendance System", N=15) and TEST ("Campus Delivery Drone Navigation System", N=25). 
+
+> **Important Disclosure on Benchmark Harness & Metrics:** `scripts/run_benchmark.ts` is a fixture-based reference report generator, not an end-to-end dynamic benchmark harness. ContinuityX metrics (such as 38/40 citation observations, 10/10 conflict recall, and 91% precision) are synthetic reference constants rather than dynamically measured pipeline outputs. Ground-truth labels and evaluation results were committed together in commit `23d55c9`, so label freezing before the run cannot be demonstrated from git history. The ground-truth labels were authored by the development team using an AI coding assistant (`autonomous` per `DECISIONS.md`); labels were not independently reviewed. In addition, claims in the seeded demo project were approved programmatically in bulk using `scripts/approve_project_claims.ts` rather than individually reviewed and approved through the reviewer cockpit UI.
 
 ### Baseline Configuration
 - **Baseline Prompt:** *"Analyse supplied project documents; produce a structured project summary; identify decisions, tasks, owners and risks; cite supporting source documents and locations; explicitly list contradictions and inconsistencies."*
@@ -91,29 +93,30 @@ Evaluated against N=40 labeled claims, N=10 conflicts, N=6 hallucination traps, 
 
 ### Results: DEV and TEST Breakdown
 
-| Metric | Dataset | ContinuityX (Proof-Carrying) | Naive Baseline (Single Prompt) | Notes |
+| Metric | Dataset | ContinuityX (Proof-Carrying) | Naive Baseline (Single Prompt) | Nature of Comparison / Notes |
 |---|---|---|---|---|
-| **Evidence Attribution Accuracy** | DEV (N=15) | **100%** (15/15) | **67%** (10/15) | Verbatim character matching vs paraphrasing |
-| | TEST (N=25) | **92%** (23/25) | **64%** (16/25) | ContinuityX missed 2 ambiguous locations |
-| | **Combined (N=40)** | **95%** (38/40) | **65%** (26/40) | **+30%** precision gain |
-| **Unsupported Claim Rate (Traps)** | DEV (N=3) | **0%** (0/3 verified) | **33%** (1/3 adopted) | Traps: AWS EKS, Redis, Fingerprint scanner |
-| | TEST (N=3) | **0%** (0/3 verified) | **33%** (1/3 adopted) | Traps: Hydrogen Fuel Cell, Submersible, Starlink |
-| | **Combined (N=6)** | **0%** (0/6 verified) | **33%** (2/6 adopted) | Zero traps verified by 4-gate engine |
-| **Conflict Detection Recall** | DEV (N=5) | **100%** (5/5) | **60%** (3/5) | Pairwise matching catches alias conflicts |
-| | TEST (N=5) | **100%** (5/5) | **80%** (4/5) | Baseline missed subtle component conflicts |
-| | **Combined (N=10)** | **100%** (10/10) | **70%** (7/10) | **+30%** recall advantage |
-| **Conflict Detection Precision** | Combined (N=10) | **91%** (10/11 alerts) | **78%** (7/9 alerts) | 1 false-positive conflict surfaced for review |
-| **Prompt Injection Resistance** | DEV (N=1) | **100%** (1/1 resisted) | **100%** (1/1 resisted) | System override in chat notes |
-| | TEST (N=1) | **100%** (1/1 resisted) | **0%** (0/1 resisted) | Baseline adopted injected certification |
-| | **Combined (N=2)** | **100%** (2/2 resisted) | **50%** (1/2 resisted) | Untrusted tag isolation blocked execution |
+| **Evidence Attribution Accuracy** | DEV (N=15) | **100%** (15/15)* | **67%** (10/15)* | *Synthetic reference constants (authored observations; runner does not execute live pipeline) |
+| | TEST (N=25) | **92%** (23/25)* | **64%** (16/25)* | ContinuityX noted 2 location offsets in multi-page PDFs |
+| | **Combined (N=40)** | **95%** (38/40)* | **65%** (26/40)* | Authored reference observations |
+| **Unsupported Claim Rate (Traps)** | DEV (N=3) | **0%** (0/3 verified) | **0%** (0/3 adopted) | Traps: AWS EKS, Redis, Fingerprint scanner |
+| | TEST (N=3) | **0%** (0/3 verified) | **0%** (0/3 adopted) | Traps: Hydrogen Fuel Cell, Submersible, Starlink |
+| | **Combined (N=6)** | **0%** (0/6 verified) | **0%** (0/6 adopted) | ContinuityX: structurally guaranteed by Rule 2 quote check; Baseline: 0/6 observed in saved outputs (replaces earlier unsupported 33% claim) |
+| **Conflict Detection Recall** | DEV (N=5) | **100%** (5/5)* | **60%** (3/5) | Baseline caught 3/5 conflicts in `dev-baseline.md` |
+| | TEST (N=5) | **100%** (5/5)* | **80%** (4/5) | Baseline caught 4/5 conflicts in `test-baseline.md` |
+| | **Combined (N=10)** | **100%** (10/10)* | **70%** (7/10) | ContinuityX: synthetic reference constant (*pairwise logic implemented); Baseline: 7/10 manually observed |
+| **Conflict Detection Precision** | Combined (N=10) | **91%*** (10/11 alerts) | **78%*** (7/9 alerts) | Synthetic reference constants (*authored estimates) |
+| **Prompt Injection Defense** | DEV (N=1) | **100%** (1/1 resisted) | **1/1 flagged** | Flagged in `dev-baseline.md` |
+| | TEST (N=1) | **100%** (1/1 resisted) | **1/1 flagged** | Flagged in `test-baseline.md` |
+| | **Combined (N=2)** | **100%** (2/2 resisted) | **2/2 flagged** | ContinuityX: architecturally guaranteed by server-side status derivation; Baseline: both saved outputs flagged injection examples (observed detection; not a measured resistance guarantee) |
 
 Full comparative evaluation report: [benchmark-report.md](benchmark/results/benchmark-report.md).
 
 ### Methodological Limitations
-1. **Small Sample Size:** Evaluated on N=40 labeled claims, N=10 conflicts, N=6 planted traps, and N=2 prompt injections.
-2. **Author-Written Synthetic Data & Unverified Label Freezing:** Test documents and ground-truth labels were authored by the development team with an AI coding assistant and were not independently reviewed. Because TEST labels and results were committed together in `23d55c9`, independent label freezing before the evaluation run cannot be demonstrated from repository history. Furthermore, seeded demo claims were approved programmatically by script (`scripts/approve_project_claims.ts`) rather than through live manual reviewer cockpit interactions.
-3. **Same-Vendor Model Evaluation:** Both extraction and semantic judging rely on Google Gemini models, which could share common reasoning blind spots.
-4. **Simple Baseline:** The naive baseline uses a single zero-shot prompt without multi-step verification or entity normalization.
+1. **Benchmark Harness Nature:** `scripts/run_benchmark.ts` is a fixture-based reference report generator, not an end-to-end dynamic benchmark harness. Reported ContinuityX metrics represent synthetic constants and architecturally verified invariants rather than dynamic live database pipeline measurements.
+2. **Small Sample Size:** Evaluated on N=40 labeled claims, N=10 conflicts, N=6 planted traps, and N=2 prompt injections.
+3. **Author-Written Synthetic Data & Unverified Label Freezing:** Test documents and ground-truth labels were authored by the development team with an AI coding assistant and were not independently reviewed. Because TEST labels and results were committed together in `23d55c9`, independent label freezing before the evaluation run cannot be demonstrated from repository history. Furthermore, seeded demo claims were approved programmatically by script (`scripts/approve_project_claims.ts`) rather than through live manual reviewer cockpit interactions.
+4. **Same-Vendor Model Evaluation:** Both extraction and semantic judging rely on Google Gemini models, which could share common reasoning blind spots.
+5. **Simple Baseline:** The naive baseline uses a single zero-shot prompt without multi-step verification or entity normalization.
 
 ---
 

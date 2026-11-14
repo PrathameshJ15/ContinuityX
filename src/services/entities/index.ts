@@ -6,6 +6,7 @@ import { AppError } from "@/lib/api-response";
 import { normalizeEntityKey } from "./resolution";
 import { createEntitySchema, entityNameSchema, entityAliasSchema } from "./schema";
 import { ZodError } from "zod";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 
 export async function listEntitiesService(
   projectId: string,
@@ -13,6 +14,10 @@ export async function listEntitiesService(
   explicitUserId?: string
 ) {
   await requireProjectAccess(projectId, "claims:view_unapproved", explicitUserId);
+
+  const cacheKey = `entities:${projectId}:${includeMerged}`;
+  const cached = getCached<unknown>(cacheKey);
+  if (cached) return cached;
 
   const entities = await prisma.entity.findMany({
     where: {
@@ -28,7 +33,7 @@ export async function listEntitiesService(
     },
   });
 
-  return entities.map((e) => ({
+  const result = entities.map((e) => ({
     id: e.id,
     canonicalName: e.canonicalName,
     normalizedId: e.normalizedId,
@@ -42,6 +47,9 @@ export async function listEntitiesService(
     claimCount: e._count.claims,
     mergedCount: e._count.mergedEntities,
   }));
+
+  setCached(cacheKey, result, 60);
+  return result;
 }
 
 export async function updateEntityService(
@@ -173,6 +181,9 @@ export async function updateEntityService(
     },
   });
 
+  invalidateCache(projectId);
+  invalidateCache("entities:");
+
   return updated;
 }
 
@@ -279,6 +290,9 @@ export async function mergeEntitiesService(
       targetName: target.canonicalName,
     },
   });
+
+  invalidateCache(projectId);
+  invalidateCache("entities:");
 
   return { merged: true, sourceEntityId: source.id, targetEntityId: target.id };
 }
@@ -408,6 +422,9 @@ export async function createManualEntityService(
     entityId: entity.id,
     metadata: { canonicalName: entity.canonicalName, type: entity.type },
   });
+
+  invalidateCache(projectId);
+  invalidateCache("entities:");
 
   return entity;
 }

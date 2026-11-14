@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit";
 import { AppError } from "@/lib/api-response";
 import { claimHasOpenConflict } from "@/services/conflicts/detection";
 import { verifyClaimService } from "@/services/verification";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 
 export interface ReviewClaimInput {
   projectId: string;
@@ -163,6 +164,8 @@ export async function reviewClaimService(input: ReviewClaimInput) {
     }
   }
 
+  invalidateCache(input.projectId);
+
   return result;
 }
 
@@ -171,6 +174,10 @@ export async function getReviewQueueService(
   userId?: string
 ) {
   await requireProjectAccess(projectId, "claims:view_unapproved", userId);
+
+  const cacheKey = `review:${projectId}`;
+  const cached = getCached<unknown>(cacheKey);
+  if (cached) return cached;
 
   // Fetch metrics counts and pending queue claims in parallel
   const [claimCounts, pendingClaims, openConflictsCount] = await Promise.all([
@@ -284,7 +291,7 @@ export async function getReviewQueueService(
       createdAt: c.createdAt,
     }));
 
-  return {
+  const result = {
     metrics: {
       totalClaims,
       pendingCount,
@@ -294,4 +301,6 @@ export async function getReviewQueueService(
     },
     queue: queueItems,
   };
+  setCached(cacheKey, result, 30);
+  return result;
 }

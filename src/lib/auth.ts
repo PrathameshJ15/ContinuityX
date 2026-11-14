@@ -57,6 +57,23 @@ export async function verifySessionToken(token: string): Promise<AuthenticatedUs
   }
 }
 
+const globalForAuth = globalThis as unknown as {
+  continuityUserSessionCache?: Map<string, { user: AuthenticatedUser; expiresAt: number }>;
+};
+
+const userSessionCache =
+  globalForAuth.continuityUserSessionCache ??
+  new Map<string, { user: AuthenticatedUser; expiresAt: number }>();
+globalForAuth.continuityUserSessionCache = userSessionCache;
+
+export function invalidateUserCache(userId?: string) {
+  if (userId) {
+    userSessionCache.delete(userId);
+  } else {
+    userSessionCache.clear();
+  }
+}
+
 /**
  * Retrieves and validates the current user session on the server.
  * Returns null if unauthenticated or token is expired/invalid.
@@ -74,12 +91,24 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
       return null;
     }
 
+    const now = Date.now();
+    const cached = userSessionCache.get(payload.id);
+    if (cached && cached.expiresAt > now) {
+      return cached.user;
+    }
+
     // Verify user still exists in database to prevent deleted accounts from accessing resources
     try {
       const user = await prisma.user.findUnique({
         where: { id: payload.id },
         select: { id: true, email: true, name: true },
       });
+      if (user && process.env.NODE_ENV !== "test") {
+        userSessionCache.set(payload.id, {
+          user,
+          expiresAt: now + 30000,
+        });
+      }
       return user;
     } catch {
       // In transient DB disconnects, preserve verified JWT identity rather than falsifying 401

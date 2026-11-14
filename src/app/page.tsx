@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Logo } from "@/components/ui/logo";
 
 export default function LandingPage() {
   return (
@@ -8,12 +9,7 @@ export default function LandingPage() {
       <header className="w-full bg-card/95 border-b border-line sticky top-0 z-50 backdrop-blur-sm">
         <div className="max-w-[1120px] mx-auto h-20 px-6 sm:px-8 flex items-center justify-between">
           {/* Logo / Brand Name */}
-          <Link
-            href="/"
-            className="font-heading font-extrabold text-[20px] text-ink tracking-tight hover:opacity-90 transition-opacity min-h-[44px] inline-flex items-center"
-          >
-            ContinuityX
-          </Link>
+          <Logo size="md" href="/" className="min-h-[44px]" />
 
           {/* Navigation Links */}
           <nav className="hidden min-[901px]:flex items-center gap-8 text-[14px] text-muted font-normal">
@@ -57,11 +53,11 @@ export default function LandingPage() {
       </header>
 
       {/* 2. HERO SECTION */}
-      <section className="pt-20 pb-20 px-6 sm:px-8 bg-bg">
-        <div className="max-w-[1120px] mx-auto grid grid-cols-1 min-[901px]:grid-cols-12 gap-12 min-[901px]:gap-16 items-start">
+      <section className="pt-16 sm:pt-20 pb-16 sm:pb-20 px-4 sm:px-8 bg-bg">
+        <div className="max-w-[1120px] mx-auto grid grid-cols-1 min-[901px]:grid-cols-12 gap-10 min-[901px]:gap-16 items-start">
           {/* Left Column: Headline, subtext, action buttons */}
           <div className="min-[901px]:col-span-7 pt-2">
-            <h1 className="text-[44px] sm:text-[54px] min-[901px]:text-[56px] leading-[1.08] font-heading font-extrabold text-ink tracking-[-0.03em]">
+            <h1 className="text-[34px] sm:text-[48px] min-[901px]:text-[56px] leading-[1.08] font-heading font-extrabold text-ink tracking-[-0.03em]">
               Every claim in the
               <br />
               handover shows
@@ -332,14 +328,14 @@ export default function LandingPage() {
       {/* 4. CONFLICTS SECTION */}
       <section
         id="conflicts"
-        className="py-20 px-6 sm:px-8 bg-soft-section border-y border-line"
+        className="py-16 sm:py-20 px-4 sm:px-8 bg-soft-section border-y border-line"
       >
         <div className="max-w-[1120px] mx-auto">
           {/* Header */}
           <div className="text-[13px] font-mono font-semibold tracking-wider text-brand uppercase mb-2">
             CONFLICTS
           </div>
-          <h2 className="text-[32px] sm:text-[38px] font-heading font-extrabold text-ink leading-tight tracking-tight">
+          <h2 className="text-[28px] sm:text-[38px] font-heading font-extrabold text-ink leading-tight tracking-tight">
             When sources disagree, both are
             <br className="hidden sm:inline" /> shown.
           </h2>
@@ -389,14 +385,14 @@ export default function LandingPage() {
       </section>
 
       {/* 5. HANDOVER SECTION */}
-      <section id="receipt" className="py-24 px-6 sm:px-8 bg-bg border-t border-line">
-        <div className="max-w-[1120px] mx-auto grid grid-cols-1 min-[901px]:grid-cols-12 gap-12 min-[901px]:gap-16 items-start">
+      <section id="receipt" className="py-16 sm:py-24 px-4 sm:px-8 bg-bg border-t border-line">
+        <div className="max-w-[1120px] mx-auto grid grid-cols-1 min-[901px]:grid-cols-12 gap-10 min-[901px]:gap-16 items-start">
           {/* Left: Explanation */}
           <div className="min-[901px]:col-span-6 pt-2">
             <div className="text-[13px] font-mono font-semibold tracking-wider text-brand uppercase mb-3">
               HANDOVER
             </div>
-            <h2 className="text-[32px] sm:text-[38px] font-heading font-extrabold text-ink leading-[1.14] tracking-tight">
+            <h2 className="text-[28px] sm:text-[38px] font-heading font-extrabold text-ink leading-[1.14] tracking-tight">
               Approved by a person,
               <br />
               then receipted.
@@ -504,8 +500,9 @@ export default function LandingPage() {
       {/* 7. FOOTER / FINAL CTA */}
       <footer className="w-full bg-footer-bg text-white py-16 px-6 sm:px-8 mt-auto border-t border-transparent dark:border-line">
         <div className="max-w-[1120px] mx-auto flex flex-col min-[901px]:flex-row items-start min-[901px]:items-center justify-between gap-8">
-          {/* Left: Final Headline & Subtext */}
+          {/* Left: Brand Logo, Final Headline & Subtext */}
           <div>
+            <Logo size="md" textColor="text-white" href="/" className="mb-5" />
             <h2 className="text-[28px] sm:text-[32px] font-heading font-extrabold text-white tracking-tight">
               Intelligence That Keeps
               <br />

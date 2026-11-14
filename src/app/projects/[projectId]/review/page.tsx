@@ -524,7 +524,7 @@ export default function ReviewSplitPanePage({
                 <button
                   onClick={handleAcceptClick}
                   disabled={submittingAction || currentClaim.hasOpenConflict}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 min-h-[44px] text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
                   title="Accept claim into handover (Shortcut: A)"
                 >
                   <Check className="h-4 w-4" />
@@ -534,7 +534,7 @@ export default function ReviewSplitPanePage({
                 <button
                   onClick={handleRejectClick}
                   disabled={submittingAction}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 min-h-[44px] text-xs font-semibold shadow-xs disabled:opacity-50 transition-colors cursor-pointer"
                   title="Reject claim (Shortcut: R)"
                 >
                   <Ban className="h-4 w-4" />
@@ -544,7 +544,7 @@ export default function ReviewSplitPanePage({
                 <button
                   onClick={() => submitDecision("NEEDS_CLARIFICATION", { comments: "Clarification requested from project owner" })}
                   disabled={submittingAction}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-accent transition-colors shadow-xs cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 min-h-[44px] text-xs font-medium text-foreground hover:bg-accent transition-colors shadow-xs cursor-pointer"
                   title="Request clarification from project owner"
                 >
                   <HelpCircle className="h-4 w-4 text-purple-600" />
@@ -553,7 +553,7 @@ export default function ReviewSplitPanePage({
 
                 <button
                   onClick={handleNext}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-accent transition-colors shadow-xs cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 min-h-[44px] text-xs font-medium text-foreground hover:bg-accent transition-colors shadow-xs cursor-pointer"
                   title="Next claim (Shortcut: N)"
                 >
                   <ArrowRight className="h-4 w-4" />

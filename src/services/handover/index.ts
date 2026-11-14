@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { requireProjectAccess } from "@/lib/permissions";
 import { BadRequestError, NotFoundError } from "@/lib/api-response";
 import { writeAudit } from "@/lib/audit";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 import {
   HandoverSnapshotPayload,
   SnapshotClaimItem,
@@ -9,48 +10,71 @@ import {
   canonicalizeSnapshot,
   computeSnapshotHash,
 } from "./canonical";
-import { assembleHandoverSections } from "./sections";
+import { assembleHandoverSections, AssembledHandover } from "./sections";
 import { generateHandoverPdf } from "./pdf-exporter";
+
+export interface HandoverDraftPreviewResult {
+  canApprove: boolean;
+  blockingReasons: string[];
+  unresolvedConflictCount: number;
+  draft: AssembledHandover;
+}
 
 /**
  * Returns a draft preview of the handover with blocking validation
  */
-export async function getHandoverDraftPreviewService(projectId: string, userId: string) {
+export async function getHandoverDraftPreviewService(
+  projectId: string,
+  userId: string
+): Promise<HandoverDraftPreviewResult> {
   await requireProjectAccess(projectId, "handover:approve", userId);
 
-  // Fetch all accepted / edited claims
-  const acceptedClaims = await prisma.claim.findMany({
-    where: {
-      projectId,
-      reviewState: { in: ["ACCEPTED", "EDITED"] },
-    },
-    include: {
-      subjectEntity: true,
-      verifications: {
-        orderBy: { verifiedAt: "desc" },
-        take: 1,
+  const cacheKey = `handover:draft:${projectId}`;
+  const cached = getCached<HandoverDraftPreviewResult>(cacheKey);
+  if (cached) return cached;
+
+  // Fetch all accepted claims, open conflicts, project details, and latest handover version concurrently
+  const [acceptedClaims, openConflicts, project, latestHandover] = await Promise.all([
+    prisma.claim.findMany({
+      where: {
+        projectId,
+        reviewState: { in: ["ACCEPTED", "EDITED"] },
       },
-      evidence: {
-        include: {
-          document: {
-            select: { id: true, fileName: true, checksum: true },
+      include: {
+        subjectEntity: true,
+        verifications: {
+          orderBy: { verifiedAt: "desc" },
+          take: 1,
+        },
+        evidence: {
+          include: {
+            document: {
+              select: { id: true, fileName: true, checksum: true },
+            },
           },
         },
       },
-    },
-    orderBy: { createdAt: "asc" },
-  });
-
-  // Check for OPEN conflicts in project
-  const openConflicts = await prisma.conflict.findMany({
-    where: {
-      projectId,
-      status: { in: ["OPEN", "POSSIBLY_SUPERSEDED", "UNDER_REVIEW", "REQUIRES_CLARIFICATION"] },
-    },
-    include: {
-      subjectEntity: true,
-    },
-  });
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.conflict.findMany({
+      where: {
+        projectId,
+        status: { in: ["OPEN", "POSSIBLY_SUPERSEDED", "UNDER_REVIEW", "REQUIRES_CLARIFICATION"] },
+      },
+      include: {
+        subjectEntity: true,
+      },
+    }),
+    prisma.project.findUnique({
+      where: { id: projectId },
+      select: { name: true },
+    }),
+    prisma.handover.findFirst({
+      where: { projectId, status: "APPROVED" },
+      orderBy: { version: "desc" },
+      select: { version: true },
+    }),
+  ]);
 
   const openConflictClaimIds = new Set<string>();
   for (const c of openConflicts) {
@@ -85,18 +109,7 @@ export async function getHandoverDraftPreviewService(projectId: string, userId: 
     }
   }
 
-  // Get project details and latest version count
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { name: true },
-  });
-
-  const latestHandover = await prisma.handover.findFirst({
-    where: { projectId, status: "APPROVED" },
-    orderBy: { version: "desc" },
-    select: { version: true },
-  });
-
+  // Compute draft version
   const draftVersion = (latestHandover?.version ?? 0) + 1;
 
   // Format snapshot claim items
@@ -133,12 +146,14 @@ export async function getHandoverDraftPreviewService(projectId: string, userId: 
     unresolvedConflictCount: openConflicts.length,
   });
 
-  return {
+  const result = {
     canApprove: blockingReasons.length === 0,
     blockingReasons,
     unresolvedConflictCount: openConflicts.length,
     draft: assembled,
   };
+  setCached(cacheKey, result, 60);
+  return result;
 }
 
 /**
@@ -342,6 +357,9 @@ export async function approveHandoverService(projectId: string, userId: string, 
     },
     { maxWait: 30000, timeout: 60000 }
   );
+
+  invalidateCache(projectId);
+  invalidateCache("handover:");
 
   return result;
 }

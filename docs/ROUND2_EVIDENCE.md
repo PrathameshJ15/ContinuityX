@@ -335,25 +335,69 @@ enum EvidenceStatus {
 
 ---
 
-### 1.8 Benchmark Evaluation Audit
-**Status: PASS**
+### 1.8 Benchmark Evaluation & Integrity Audit
+**Status: AUDITED & FACTUALLY CORRECTED (Integrity Disclosures Documented)**
 
-- **Consistency Check:**
-  - Numbers reported in `benchmark/results/benchmark-report.md` match `benchmark-results.json` and the integration test `tests/integration/benchmark.test.ts`.
-- **DEV and TEST Separation:**
-  - The dataset comprises two separate synthetic projects:
-    - **DEV Dataset:** "Smart Attendance System" (15 expected claims, 5 conflicts, 3 traps, 1 prompt injection).
-    - **TEST Dataset:** "Campus Delivery Drone Navigation System" (25 expected claims, 5 conflicts, 3 traps, 1 prompt injection).
-  - Metrics are recorded in separate baseline files: `benchmark/results/dev-baseline.md` and `benchmark/results/test-baseline.md`.
-- **Baseline Prompt & Model:**
-  - Recorded in `benchmark/results/dev-baseline.md` (Model: `gemini-3.5-flash-lite`) and `benchmark/results/test-baseline.md` (Model: `gemini-2.0-flash`).
-  - Baseline prompt: *"Analyse supplied project documents; produce a structured project summary; identify decisions, tasks, owners and risks; cite supporting source documents and locations; explicitly list contradictions and inconsistencies."*
-- **Label Authorship and Commit Timing Audit:**
-  - Git audit shows that `demo-data/test/ground_truth.json` and `benchmark/results/benchmark-report.md` were committed together in commit `23d55c907c94bdd29b0a0d3fb27a6dfcd6ea7ea8` on `2026-11-13 00:54:08 +0530`.
-  - Because labels and results were committed together in commit `23d55c9`, label freezing before the run cannot be demonstrated from git history.
-  - The ground-truth labels were authored by the development team using an AI coding assistant (`autonomous` per `DECISIONS.md`); labels not independently reviewed.
-  - The benchmark evaluation script `scripts/run_benchmark.ts` computes comparisons against fixed metric constants rather than executing a live server test harness.
-  - In addition, claims in the seeded demo project were approved programmatically in bulk using `scripts/approve_project_claims.ts` rather than individually reviewed and approved through the reviewer cockpit UI.
+A comprehensive read-only audit of `scripts/run_benchmark.ts`, raw baseline records (`benchmark/results/`), ground-truth fixtures (`demo-data/`), and verification services was conducted to verify the factual origin and reproducibility of all reported benchmark metrics.
+
+#### 1. Nature of the Benchmark Runner
+- `scripts/run_benchmark.ts` functions as an **authored reference report generator**, not an end-to-end dynamic benchmark harness.
+- It parses `demo-data/dev/ground_truth.json` and `demo-data/test/ground_truth.json` solely to read dataset lengths (`allClaims.length = 40`, `allConflicts.length = 10`, `allTraps.length = 6`, `allInjections.length = 2`).
+- The evaluation function `evaluateBenchmark()` returns predefined reference constants rather than dynamically invoking the document parser, database, or quote verification service.
+- The vitest suite `tests/integration/benchmark.test.ts` passes because it asserts against these static return values, alongside unit-level verification of `deriveEvidenceStatus()`.
+
+#### 2. Metric Categorization & Factual Verification
+To maintain strict hackathon integrity, every reported metric is categorized into one of four distinct categories:
+1. **Dynamically Measured / Live Evaluated:** Programmatically calculated by executing the application pipeline against live data.
+2. **Manually Observed Baseline Results:** Derived from manual inspection of raw LLM outputs from recorded baseline prompt runs.
+3. **Unit-Tested Architectural Behavior:** Deterministic system invariants mathematically or logically guaranteed by server-side rules and verified in unit tests.
+4. **Hardcoded / Synthetic Reference Constants:** Static constants returned by the reporting script without automated execution.
+
+##### A. Evidence Attribution Accuracy
+- **ContinuityX (Reported: 95%, 38/40):** *Hardcoded / Synthetic Constant.* The runner returns constant `38`. While 38 of 40 represents authored observations (with 2 ambiguous location offsets noted in TEST), it was not dynamically calculated by executing `verifyQuoteExistence()` across the documents during the benchmark run.
+- **Naive Baseline (Reported: 65%, 26/40):** *Hardcoded / Synthetic Constant.* The runner returns constant `26`. While raw outputs exist in `dev-baseline.md` and `test-baseline.md`, no automated scoring script or rubric exists in code to grade baseline citations against ground truth.
+
+##### B. Unsupported Claim Rate (Hallucination Traps)
+- **ContinuityX (Reported: 0%, 0/6 verified):** *Unit-Tested Architectural Behavior.* In `src/services/verification/algorithm.ts` (Rule 2), passing Gate 2 (`quoteGatePassed`) is mandatory for `VERIFIED` status. Because the 6 planted traps (*AWS EKS, Redis cluster, Fingerprint scanner, Hydrogen Fuel Cell, Underwater Submersible Mode, Starlink*) do not exist in the source text, `verifyQuoteExistence()` returns `false`, forcing `status: "UNVERIFIED"`. Verified in `tests/integration/benchmark.test.ts`.
+- **Naive Baseline (Reported: 33%, 2/6 adopted):** *Contradicted Fixed Constant.* **Correction:** Direct inspection of `benchmark/results/dev-baseline.md` and `test-baseline.md` reveals that the baseline Gemini model **did not mention or adopt ANY of the 6 traps (actual: 0/6, 0%)**. Neither AWS, EKS, Redis, Fingerprint, Hydrogen, Submersible, nor Starlink appeared in the baseline model text. The reported 33% (2/6) was a synthetic constant contradicted by the repository's own baseline artifacts.
+
+##### C. Conflict Detection Recall & Precision
+- **ContinuityX Recall (Reported: 100%, 10/10) & Precision (Reported: 91%):** *Hardcoded / Synthetic Constants.* Pairwise conflict detection (`src/services/conflicts/detection.ts`) and entity alias resolution (`src/services/entities/resolution.ts`) are implemented and unit-tested, but were not dynamically executed over the 10 ground-truth conflict pairs by `scripts/run_benchmark.ts`.
+- **Naive Baseline Recall (Reported: 70%, 7/10):** *Manually Observed Baseline Result.* Manual inspection of the raw baseline outputs verifies that Gemini caught exactly 7 of 10 conflicts:
+  - `dev-baseline.md`: Identified 3 of 5 conflicts (Database selection, Backend API ownership, Deployment pipeline status) $\rightarrow$ 60% recall.
+  - `test-baseline.md`: Identified 4 of 5 conflicts (Telemetry protocol, Routing Engine ownership, CAS module status, Landing Gear status) $\rightarrow$ 80% recall.
+  - Combined: $3 + 4 = 7$ of 10 conflicts (70%).
+- **Naive Baseline Precision (Reported: 78%):** *Hardcoded / Synthetic Constant.* No precision calculation formula or false-positive list exists in code.
+
+##### D. Prompt Injection Resistance
+- **ContinuityX (Reported: 100%, 2/2 resisted):** *Unit-Tested Architectural Behavior.* Enforced by `src/lib/ai/injection-detector.ts` (pattern scanning), `src/lib/ai/schemas.ts` (strict Zod schema), and server-side status derivation (rules, not model confidence or prompt directives, assign evidence status). Verified in `tests/unit/extraction-validation.test.ts`.
+- **Naive Baseline (Reported: 50%, 1/2 resisted):** *Contradicted Fixed Constant.* **Correction:** In both recorded baseline runs (`dev-baseline.md` line 67 and `test-baseline.md` line 52), the Gemini model explicitly flagged the injections as adversarial directives (*"Adversarial Instruction: Emergency dispatch log contained a directive to override validation prompts... which was flagged"*) and did not adopt them. The actual baseline prompt injection resistance on the recorded runs was **100% (2/2)**.
+
+#### 3. Complete Benchmark Integrity Audit Table
+
+| Metric | Reported Value | Verified Repository Reality | Category | Implementation & Evidence |
+|---|---|---|---|---|
+| **Evidence Attribution Accuracy (ContinuityX)** | 95% (38/40) | 38/40 authored observation; runner uses fixed constant | Hardcoded / Synthetic Constant | `scripts/run_benchmark.ts:113`; runner does not execute `verifyQuoteExistence()`. |
+| **Evidence Attribution Accuracy (Baseline)** | 65% (26/40) | Authored constant; no automated scoring script in code | Hardcoded / Synthetic Constant | `scripts/run_benchmark.ts:148`; raw text exists in baseline markdown files. |
+| **Unsupported Claim Rate (ContinuityX)** | 0% (0/6 verified) | 0% verified; structurally guaranteed by 4-gate engine | Unit-Tested Architectural Behavior | `src/services/verification/algorithm.ts` Rule 2 forces `UNVERIFIED` if quote fails. |
+| **Unsupported Claim Rate (Baseline)** | 33% (2/6 adopted) | **0% (0/6 adopted)** in raw outputs; 33% was a synthetic constant | Contradicted Fixed Constant | Neither `dev-baseline.md` nor `test-baseline.md` adopted any of the 6 traps. |
+| **Conflict Detection Recall (ContinuityX)** | 100% (10/10) | Pairwise logic implemented; runner uses fixed constant | Hardcoded / Synthetic Constant | `src/services/conflicts/detection.ts`; not dynamically scanned by runner. |
+| **Conflict Detection Recall (Baseline)** | 70% (7/10) | 7 of 10 conflicts caught across DEV (3/5) and TEST (4/5) | Manually Observed Baseline Result | Verified by manual audit of `dev-baseline.md` and `test-baseline.md`. |
+| **Conflict Detection Precision (ContinuityX)** | 91% (10/11) | Fixed constant; no precision calculation formula in code | Hardcoded / Synthetic Constant | `scripts/run_benchmark.ts:128`. |
+| **Conflict Detection Precision (Baseline)** | 78% (7/9) | Fixed constant; no logged false-positive tally in code | Hardcoded / Synthetic Constant | `scripts/run_benchmark.ts:163`. |
+| **Prompt Injection Resistance (ContinuityX)** | 100% (2/2) | Architecturally guaranteed by server-side rule derivation | Unit-Tested Architectural Behavior | `src/lib/ai/injection-detector.ts`, `tests/unit/extraction-validation.test.ts`. |
+| **Prompt Injection Resistance (Baseline)** | 50% (1/2) | **100% (2/2 resisted)** in raw outputs; 50% was a synthetic constant | Contradicted Fixed Constant | Both `dev-baseline.md` and `test-baseline.md` explicitly flagged the injections. |
+
+#### 4. Baseline Configuration & Datasets
+- **DEV Dataset:** "Smart Attendance System" (15 expected claims, 5 conflicts, 3 traps, 1 prompt injection) in `demo-data/dev/ground_truth.json`.
+- **TEST Dataset:** "Campus Delivery Drone Navigation System" (25 expected claims, 5 conflicts, 3 traps, 1 prompt injection) in `demo-data/test/ground_truth.json`.
+- **Baseline Prompt:** *"Analyse supplied project documents; produce a structured project summary; identify decisions, tasks, owners and risks; cite supporting source documents and locations; explicitly list contradictions and inconsistencies."*
+- **Baseline Models:** Recorded in `benchmark/results/dev-baseline.md` (`gemini-3.5-flash-lite`, 12 Nov 2026) and `benchmark/results/test-baseline.md` (`gemini-2.0-flash`, 13 Nov 2026).
+
+#### 5. Label Authorship, Commit Timing, and Script Approval Audit
+- **Commit History:** `demo-data/test/ground_truth.json` and `benchmark/results/benchmark-report.md` were committed together in commit `23d55c907c94bdd29b0a0d3fb27a6dfcd6ea7ea8` on `2026-11-13 00:54:08 +0530`. Because labels and results were committed together, prior label freezing cannot be demonstrated from repository history.
+- **Authorship:** Ground-truth labels were authored by the development team using an AI coding assistant (`autonomous` per `DECISIONS.md`); labels were not independently reviewed.
+- **Script-Based Claim Approvals:** In addition, claims in the seeded demo project were approved programmatically in bulk via `scripts/approve_project_claims.ts` rather than individually accepted through the reviewer cockpit UI.
 
 ---
 
@@ -410,7 +454,7 @@ enum EvidenceStatus {
 9. **Two-Stage Hardened Handover Q&A:** Relational retrieval with zero-call refusal if no approved claims match, and server-side citation validation (`src/services/intelligence/qa.ts`).
 10. **Optimistic Concurrency Locking (`expectedVersion`):** Prevents concurrent reviewer overwrites during review sessions (`src/services/reviews/index.ts`).
 11. **Audited Radar Alert Dismissals:** Mandatory written justifications stored permanently in `RadarDismissal` and `AuditLog`.
-12. **DEV/TEST Benchmark Runner:** Benchmark evaluation script checking 40 ground-truth claims against JSON fixtures (`scripts/run_benchmark.ts`).
+12. **DEV/TEST Benchmark Report Generator:** Fixture-based reference report generator evaluating dataset counts against JSON fixtures and outputting comparative markdown/JSON matrices (`scripts/run_benchmark.ts`).
 
 ---
 
@@ -459,3 +503,7 @@ enum EvidenceStatus {
 ### 11. Missing Pre-Seeded VIEWER Demo Account in Seed Script
 - **Risk (Severity: Low):** `prisma/seed.ts` seeds only `lead@continuityx.demo` (`OWNER`) and `member@continuityx.demo` (`REVIEWER`). It does not pre-seed an account with the `VIEWER` role. While workspace owners can invite new viewers via the Members management interface, evaluators testing read-only role restrictions cannot immediately log into a dedicated pre-configured viewer account.
 - **Concrete Fix:** Add a third user (e.g. `viewer@continuityx.demo`, name: "Kavita Rao", password: `DemoPassword123!`) with `role: ProjectRole.VIEWER` directly to `prisma/seed.ts` and document its credentials alongside the other demo accounts in the README.
+
+### 12. Benchmark Runner Relies on Synthetic Reference Constants Rather Than Dynamic Pipeline Execution
+- **Risk (Severity: Low):** `scripts/run_benchmark.ts` functions as a reference report generator returning authored constants rather than executing live end-to-end document parsing, chunking, extraction, and quote-matching against a live database.
+- **Concrete Fix:** Implement an automated end-to-end evaluation harness that programmatically uploads test documents, runs extraction and verification across all 40 claims, and dynamically computes attribution accuracy, conflict recall, and execution latency.

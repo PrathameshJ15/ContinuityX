@@ -2,13 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { formatRoleLabel, getRoleBadgeClass } from "@/lib/roles";
-import {
-  ChevronRight,
-  Search,
-  Menu,
-  FolderKanban,
-} from "lucide-react";
+import { Menu, Command, ChevronRight } from "lucide-react";
+import { Chip } from "@/components/ui/chip";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { LogoSymbol } from "@/components/ui/logo";
 
 export interface TopbarProps {
   projectName?: string;
@@ -17,46 +14,50 @@ export interface TopbarProps {
   userRole?: string;
   currentPageTitle?: string;
   onOpenSearch: () => void;
-  onOpenMobileMenu?: () => void;
+  onOpenMobileMenu: () => void;
 }
 
 export function Topbar({
   projectName,
   projectId,
-  projectStatus,
-  userRole,
   currentPageTitle,
   onOpenSearch,
   onOpenMobileMenu,
 }: TopbarProps) {
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b bg-card/80 px-4 sm:px-6 backdrop-blur-md">
-      {/* Left: Mobile Toggle & Breadcrumbs */}
+    <header className="h-14 border-b border-line bg-card px-3 sm:px-6 flex items-center justify-between sticky top-0 z-20 select-none">
+      {/* Left: Mobile Menu + Mobile Logo + Breadcrumbs */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-        {onOpenMobileMenu && (
-          <button
-            onClick={onOpenMobileMenu}
-            className="md:hidden rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onOpenMobileMenu}
+          className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-lg border border-line text-muted hover:text-ink hover:bg-bg transition-colors shrink-0"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
 
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0 truncate">
+        {/* Mobile Logo Mark */}
+        <Link href="/dashboard" className="lg:hidden flex items-center shrink-0">
+          <div className="h-8 w-8 rounded-lg bg-tint flex items-center justify-center border border-line/40">
+            <LogoSymbol size={20} />
+          </div>
+        </Link>
+
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[13px] sm:text-[13.5px] truncate">
           <Link
             href="/dashboard"
-            className="flex items-center gap-1 hover:text-foreground transition-colors font-medium shrink-0"
+            className="text-faint hover:text-ink transition-colors font-medium shrink-0 hidden sm:inline"
           >
-            <FolderKanban className="h-3.5 w-3.5 text-primary" />
-            <span className="hidden sm:inline">Workspace</span>
+            Workspace
           </Link>
 
           {projectName && projectId && (
             <>
-              <ChevronRight className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+              <ChevronRight className="h-3.5 w-3.5 text-faint shrink-0 hidden sm:inline" />
               <Link
                 href={`/projects/${projectId}`}
-                className="hover:text-foreground transition-colors font-medium truncate max-w-[140px] sm:max-w-[200px]"
+                className="text-faint hover:text-ink transition-colors font-medium truncate max-w-[120px] sm:max-w-[200px]"
               >
                 {projectName}
               </Link>
@@ -65,48 +66,34 @@ export function Topbar({
 
           {currentPageTitle && (
             <>
-              <ChevronRight className="h-3 w-3 text-muted-foreground/60 shrink-0" />
-              <span className="font-semibold text-foreground truncate">{currentPageTitle}</span>
+              <ChevronRight className="h-3.5 w-3.5 text-faint shrink-0" />
+              <span className="font-heading font-semibold text-ink truncate max-w-[140px] sm:max-w-none">
+                {currentPageTitle}
+              </span>
             </>
           )}
         </nav>
-
-        {projectStatus === "ARCHIVED" && (
-          <span className="hidden sm:inline-flex items-center px-2 py-0.2 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-            Archived
-          </span>
-        )}
       </div>
 
-      {/* Right: Search, Role Badge, Notifications */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+      {/* Right: Quick Jump + v3.2 Engine Chip + Theme Toggle */}
+      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
         <button
+          type="button"
           onClick={onOpenSearch}
-          className="hidden sm:flex items-center gap-2 rounded-lg border bg-muted/40 hover:bg-muted px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          title="Search (Cmd+K)"
+          className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line bg-bg text-[13px] font-heading font-medium text-muted hover:text-ink hover:border-muted transition-colors min-h-[36px]"
         >
-          <Search className="h-3.5 w-3.5" />
-          <span className="text-[11px]">Quick Jump</span>
-          <kbd className="rounded border bg-background px-1 text-[9px] font-mono">⌘K</kbd>
+          <Command className="h-3.5 w-3.5 text-faint" />
+          <span>Quick jump</span>
         </button>
 
-        {userRole && (
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${getRoleBadgeClass(
-              userRole
-            )}`}
-          >
-            {formatRoleLabel(userRole)}
-          </span>
-        )}
+        <div className="hidden sm:inline-flex">
+          <Chip variant="ok" dot size="sm">
+            v3.2 engine
+          </Chip>
+        </div>
 
-        <div className="h-4 w-px bg-border/80 hidden sm:block" />
-
-        <div className="flex items-center gap-1">
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/60 px-2 py-0.5 text-[10px] font-semibold">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="hidden sm:inline">V3.2 Engine</span>
-          </span>
+        <div className="min-h-[44px] min-w-[44px] flex items-center justify-center">
+          <ThemeToggle />
         </div>
       </div>
     </header>

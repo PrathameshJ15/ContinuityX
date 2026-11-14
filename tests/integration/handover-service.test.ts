@@ -150,7 +150,7 @@ describe("Phase 6 Handover Generation, Atomic Receipt & Permission Safeguards", 
     const draft = await getHandoverDraftPreviewService("proj-1", reviewerUser.id);
 
     expect(draft.canApprove).toBe(false);
-    expect(draft.blockingReasons.some((r) => r.includes("active open conflict"))).toBe(true);
+    expect(draft.blockingReasons.some((r: string) => r.includes("active open conflict"))).toBe(true);
   });
 
   it("approves handover v1 in one atomic transaction, computing SHA-256 receipt", async () => {

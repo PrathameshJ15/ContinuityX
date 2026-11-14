@@ -548,7 +548,7 @@ export default function ContinuityIntelligencePage({
                       <button
                         key={idx}
                         onClick={() => handleAskQuestion(q)}
-                        className="w-full text-left rounded-lg bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 text-xs text-muted-foreground hover:text-foreground transition-colors border border-border cursor-pointer shadow-xs"
+                        className="w-full text-left rounded-lg bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 p-2.5 min-h-[44px] flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors border border-border cursor-pointer shadow-xs"
                       >
                         {q}
                       </button>
@@ -558,7 +558,7 @@ export default function ContinuityIntelligencePage({
               </div>
 
               {/* Right Column: Interactive Chat Thread */}
-              <div className="lg:col-span-3 rounded-xl border border-border bg-card shadow-xs flex flex-col h-[650px] overflow-hidden">
+              <div className="lg:col-span-3 rounded-xl border border-border bg-card shadow-xs flex flex-col h-[520px] sm:h-[650px] overflow-hidden">
                 {/* Chat Scroll Area */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   {chatHistory.map((msg) => (
@@ -684,12 +684,12 @@ export default function ContinuityIntelligencePage({
                     value={questionInput}
                     onChange={(e) => setQuestionInput(e.target.value)}
                     disabled={asking}
-                    className="flex-1 rounded-xl border border-border bg-card px-4 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                    className="flex-1 min-h-[44px] rounded-xl border border-border bg-card px-4 py-2 text-[16px] sm:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
                   />
                   <button
                     type="submit"
                     disabled={asking || !questionInput.trim()}
-                    className="rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-40 inline-flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    className="min-h-[44px] rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-40 inline-flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer shrink-0"
                   >
                     <Send className="h-3.5 w-3.5" />
                     Ask

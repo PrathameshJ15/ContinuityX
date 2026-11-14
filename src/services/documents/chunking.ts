@@ -26,7 +26,30 @@ export function createStructureAwareChunks(
   const chunks: StructureChunk[] = [];
   let chunkIndex = 0;
 
-  for (const segment of segments) {
+  // Pre-coalesce contiguous segments that share the exact same structural container
+  // (e.g. multiple paragraphs within the same heading or page) without crossing boundaries
+  const coalescedSegments: ParsedSegment[] = [];
+  for (const seg of segments) {
+    const text = seg.content.trim();
+    if (!text) continue;
+
+    const prev = coalescedSegments[coalescedSegments.length - 1];
+    const canCoalesce =
+      prev &&
+      prev.pageNumber === seg.pageNumber &&
+      prev.sectionTitle === seg.sectionTitle &&
+      prev.rowStart === undefined &&
+      seg.rowStart === undefined &&
+      prev.content.length + text.length + 2 <= targetChunkSize;
+
+    if (canCoalesce) {
+      prev.content = `${prev.content}\n\n${text}`;
+    } else {
+      coalescedSegments.push({ ...seg, content: text });
+    }
+  }
+
+  for (const segment of coalescedSegments) {
     const text = segment.content.trim();
     if (!text) continue;
 

@@ -4,6 +4,7 @@ import { ProjectRole, ProjectStatus } from "@prisma/client";
 import { requireUser, requireProjectAccess } from "@/lib/permissions";
 import { AppError } from "@/lib/api-response";
 import { writeAudit } from "@/lib/audit";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 
 export const CreateProjectSchema = z.object({
   name: z.string().trim().min(2, "Project name must be at least 2 characters").max(100),
@@ -68,6 +69,8 @@ export async function createProjectService(input: z.infer<typeof CreateProjectSc
     metadata: { name: project.name },
   });
 
+  invalidateCache("projects:list");
+
   return project;
 }
 
@@ -79,6 +82,29 @@ export async function listMyProjectsService(page: number = 1, limit: number = 10
   const safePage = Math.max(1, page);
   const safeLimit = Math.min(50, Math.max(1, limit));
   const skip = (safePage - 1) * safeLimit;
+
+  const cacheKey = `projects:list:${user.id}:${safePage}:${safeLimit}`;
+  const cached = getCached<{
+    projects: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      status: ProjectStatus;
+      role: ProjectRole;
+      createdAt: Date;
+      updatedAt: Date;
+      memberCount: number;
+      pendingReviews: number;
+      recentHandover: { version: number; approvedAt: string } | null;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }>(cacheKey);
+  if (cached) return cached;
 
   const where = {
     members: {
@@ -136,7 +162,7 @@ export async function listMyProjectsService(page: number = 1, limit: number = 10
       : null,
   }));
 
-  return {
+  const result = {
     projects,
     pagination: {
       page: safePage,
@@ -145,10 +171,22 @@ export async function listMyProjectsService(page: number = 1, limit: number = 10
       totalPages: Math.ceil(total / safeLimit),
     },
   };
+
+  setCached(cacheKey, result, 30);
+  return result;
 }
 
 export async function getProjectService(projectId: string, explicitUserId?: string) {
   const { role } = await requireProjectAccess(projectId, "project:read", explicitUserId);
+
+  const cacheKey = `project:${projectId}`;
+  const cached = getCached<Record<string, unknown>>(cacheKey);
+  if (cached) {
+    return {
+      ...cached,
+      currentUserRole: role,
+    };
+  }
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -170,6 +208,8 @@ export async function getProjectService(projectId: string, explicitUserId?: stri
   if (!project) {
     throw new AppError("NOT_FOUND", "Project not found or you do not have permission to access it.", 404);
   }
+
+  setCached(cacheKey, project, 60);
 
   return {
     ...project,
@@ -202,6 +242,9 @@ export async function updateProjectService(
     metadata: validated,
   });
 
+  invalidateCache(projectId);
+  invalidateCache("projects:list");
+
   return updated;
 }
 
@@ -220,6 +263,9 @@ export async function archiveProjectService(projectId: string, explicitUserId?: 
     entityType: "PROJECT",
     entityId: projectId,
   });
+
+  invalidateCache(projectId);
+  invalidateCache("projects:list");
 
   return archived;
 }
@@ -274,6 +320,9 @@ export async function addMemberService(
     entityId: membership.id,
     metadata: { addedUserId: targetUser.id, role: validated.role },
   });
+
+  invalidateCache(projectId);
+  invalidateCache("projects:list");
 
   return membership;
 }
@@ -337,6 +386,9 @@ export async function changeMemberRoleService(
     metadata: { targetUserId, previousRole: currentMember.role, newRole },
   });
 
+  invalidateCache(projectId);
+  invalidateCache("projects:list");
+
   return updated;
 }
 
@@ -391,6 +443,9 @@ export async function removeMemberService(
     entityId: currentMember.id,
     metadata: { removedUserId: targetUserId, role: currentMember.role },
   });
+
+  invalidateCache(projectId);
+  invalidateCache("projects:list");
 
   return { success: true };
 }

@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState, use, useCallback } from "react";
+import React, { useEffect, useState, useCallback, use } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { AlertOctagon, RotateCw } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProjectOption } from "@/components/layout/sidebar";
-import { Loader2, AlertOctagon, ArrowLeft } from "lucide-react";
 import { WorkspaceProjectProvider, WorkspaceProject } from "./project-context";
+import { Button } from "@/components/ui/button";
 
 interface UserProfile {
+  id: string;
   name: string;
   email: string;
 }
@@ -20,10 +22,8 @@ export default function ProjectWorkspaceLayout({
   children: React.ReactNode;
   params: Promise<{ projectId: string }>;
 }) {
+  const { projectId } = use(params);
   const router = useRouter();
-  const pathname = usePathname();
-  const resolvedParams = use(params);
-  const projectId = resolvedParams.projectId;
 
   const [project, setProject] = useState<WorkspaceProject | null>(null);
   const [allProjects, setAllProjects] = useState<ProjectOption[]>([]);
@@ -50,9 +50,12 @@ export default function ProjectWorkspaceLayout({
     async function loadWorkspaceData() {
       try {
         setLoading(true);
-        const [projRes, projectsRes, meRes] = await Promise.all([
+        setErrorStatus(null);
+        setErrorMessage(null);
+
+        // Fetch project and user in parallel - do NOT block on full project list
+        const [projRes, meRes] = await Promise.all([
           fetch(`/api/projects/${projectId}`),
-          fetch("/api/projects"),
           fetch("/api/auth/me"),
         ]);
 
@@ -74,19 +77,22 @@ export default function ProjectWorkspaceLayout({
           setProject(projData.data);
         }
 
-        if (projectsRes.ok) {
-          const listJson = await projectsRes.json();
-          if (Array.isArray(listJson.data?.projects) && isMounted) {
-            setAllProjects(listJson.data.projects);
-          }
-        }
-
         if (meRes.ok) {
           const meJson = await meRes.json();
           if (meJson.data?.user && isMounted) {
             setUser(meJson.data.user);
           }
         }
+
+        // Load project switcher list in background (non-blocking)
+        fetch("/api/projects")
+          .then((res) => res.json())
+          .then((listJson) => {
+            if (Array.isArray(listJson.data?.projects) && isMounted) {
+              setAllProjects(listJson.data.projects);
+            }
+          })
+          .catch(() => {});
       } catch (err: unknown) {
         if (isMounted) {
           setErrorStatus(500);
@@ -104,66 +110,63 @@ export default function ProjectWorkspaceLayout({
     return () => {
       isMounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
-        <p className="text-xs font-medium text-muted-foreground">Loading enterprise project workspace...</p>
-      </div>
-    );
-  }
+  }, [projectId, router]);
 
   if (errorStatus) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-lg space-y-4">
-          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-destructive/10 text-destructive border border-destructive/20">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-bg p-4">
+        <div className="w-full max-w-md rounded-xl border border-line bg-card p-8 text-center shadow-sm space-y-4">
+          <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-xl bg-bad-tint text-bad border border-bad/20">
             <AlertOctagon className="h-6 w-6" />
           </div>
-          <h2 className="text-xl font-bold tracking-tight">
+          <h2 className="text-xl font-heading font-bold text-ink">
             {errorStatus === 404 ? "Project Not Found" : errorStatus === 403 ? "Access Denied" : "Error"}
           </h2>
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className="text-[13.5px] text-muted leading-relaxed">
             {errorMessage || "You do not have permission to access this project workspace."}
           </p>
-          <div className="pt-2">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow hover:bg-primary/90 transition-colors"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> Return to Workspace Hub
+          <div className="pt-2 flex items-center justify-center gap-3">
+            <Link href="/dashboard">
+              <Button variant="secondary" size="sm">
+                Return to Hub
+              </Button>
             </Link>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => window.location.reload()}
+            >
+              <RotateCw className="h-3.5 w-3.5 mr-1.5" />
+              <span>Retry</span>
+            </Button>
           </div>
         </div>
       </div>
     );
   }
 
-  if (!project) return null;
-
-  function getCurrentPageTitle(path: string): string {
-    if (path.endsWith("/documents")) return "Documents & Extraction";
-    if (path.endsWith("/claims")) return "Claims & Fact Graph";
-    if (path.endsWith("/entities")) return "Entity Registry";
-    if (path.endsWith("/conflicts")) return "Pairwise Conflicts";
-    if (path.endsWith("/review")) return "Evidence Review Queue";
-    if (path.endsWith("/radar")) return "Knowledge Loss Radar";
-    if (path.endsWith("/intelligence")) return "Continuity Intelligence";
-    if (path.endsWith("/handover")) return "Handover Workspace";
-    if (path.endsWith("/members")) return "Team & Permissions";
-    return "Project Dashboard";
-  }
+  const currentProjectOption = project
+    ? {
+        id: project.id,
+        name: project.name,
+        status: project.status,
+        currentUserRole: project.currentUserRole,
+      }
+    : null;
 
   return (
-    <WorkspaceProjectProvider value={{ project, setProject, refreshProject, loading }}>
+    <WorkspaceProjectProvider
+      value={{
+        project,
+        setProject,
+        loading,
+        refreshProject,
+      }}
+    >
       <AppShell
-        currentProject={project}
+        currentProject={currentProjectOption}
         projects={allProjects}
         user={user}
-        currentPageTitle={getCurrentPageTitle(pathname)}
       >
         {children}
       </AppShell>

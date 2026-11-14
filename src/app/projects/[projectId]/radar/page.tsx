@@ -262,7 +262,7 @@ export default function RadarPage({
 
       {/* Metrics KPI Cards */}
       {metrics && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <MetricCard
             title="Active Alerts"
             value={metrics.totalOpen}

@@ -1,19 +1,19 @@
-import { GeminiLLMProvider } from "../src/lib/ai/gemini-provider";
+import { GroqLLMProvider } from "../src/lib/ai/groq-provider";
 import { env } from "../src/lib/env";
 
 async function testFullAI() {
   console.log("=== Comprehensive AI Verification ===");
   console.log("1. Provider: Gemini REST API");
-  console.log("2. Extraction Model:", env.GEMINI_EXTRACTION_MODEL);
-  console.log("3. Judge Model:", env.GEMINI_JUDGE_MODEL);
+  console.log("2. Extraction Model:", env.GROQ_EXTRACTION_MODEL);
+  console.log("3. Judge Model:", env.GROQ_VERIFICATION_MODEL);
 
-  const provider = new GeminiLLMProvider();
+  const provider = new GroqLLMProvider();
 
   // Test 1: AI Extraction Pipeline
   console.log("\n--- Testing Extraction Model ---");
   const extractionSample = "Riya Sharma was assigned as lead owner of the Auth Module on 2026-01-10.";
   const extractionRes = await provider.generateStructuredText({
-    model: env.GEMINI_EXTRACTION_MODEL,
+    model: env.GROQ_EXTRACTION_MODEL,
     systemInstruction: "You are an accurate project claim extractor. Extract claims as triples (subject, attributeKey, value).",
     userPrompt: `Extract claims from this text:\n"${extractionSample}"`,
     responseJsonSchema: {
@@ -43,7 +43,7 @@ async function testFullAI() {
   // Test 2: AI Semantic Judge Pipeline
   console.log("\n--- Testing Semantic Judge Model ---");
   const judgeRes = await provider.generateStructuredText({
-    model: env.GEMINI_JUDGE_MODEL,
+    model: env.GROQ_VERIFICATION_MODEL,
     systemInstruction: "You are a strict semantic evidence judge. Output outcome SUPPORTS, CONTRADICTS, or NEUTRAL.",
     userPrompt: `Claim: (Auth Module, owner, Riya Sharma)\nExcerpt: "Riya Sharma was assigned as lead owner of the Auth Module on 2026-01-10."`,
     responseJsonSchema: {

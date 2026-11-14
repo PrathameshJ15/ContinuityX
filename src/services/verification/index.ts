@@ -12,9 +12,52 @@ import {
 } from "../conflicts/detection";
 import { SemanticSupportOutcome } from "@prisma/client";
 
+export type ClaimJudgeResult = {
+  outcome: SemanticSupportOutcome | "ERROR";
+  reason: string;
+  judgeModel: string | null;
+  judgePromptVersion: string | null;
+  rawJudgeOutput: unknown;
+};
+
 export interface VerifyClaimOptions {
   provider?: LLMProvider;
   userId?: string;
+  concurrency?: number;
+  preloadedClaim?: {
+    id: string;
+    projectId: string;
+    subjectEntityId: string;
+    attributeKey: string;
+    valueRaw: string;
+    valueNormalized: string | null;
+    category: import("@prisma/client").ClaimCategory;
+    subjectEntity: {
+      id: string;
+      canonicalName: string;
+      aliases: Array<{ alias: string }>;
+    };
+    evidence: Array<{
+      id: string;
+      excerpt: string;
+      sourceLocation?: string | null;
+      document?: {
+        id: string;
+        fileName: string;
+        deletedAt: Date | null;
+      } | null;
+      chunk?: {
+        id: string;
+        chunkIndex: number;
+        content: string;
+        sectionTitle?: string | null;
+        pageNumber?: number | null;
+        rowStart?: number | null;
+      } | null;
+    }>;
+  } | null;
+  judgeCache?: Map<string, ClaimJudgeResult>;
+  skipAuthCheck?: boolean;
 }
 
 /**
@@ -30,26 +73,32 @@ export async function verifyClaimService(
   claimId: string,
   options: VerifyClaimOptions = {}
 ) {
-  await requireProjectAccess(
-    projectId,
-    "ai:run_extraction_verification",
-    options.userId
-  );
+  if (!options.skipAuthCheck) {
+    await requireProjectAccess(
+      projectId,
+      "ai:run_extraction_verification",
+      options.userId
+    );
+  }
 
-  const claim = await prisma.claim.findFirst({
-    where: { id: claimId, projectId },
-    include: {
-      subjectEntity: {
-        include: { aliases: true },
-      },
-      evidence: {
-        include: {
-          document: true,
-          chunk: true,
-        },
-      },
-    },
-  });
+  // Use preloaded claim if already populated with subjectEntity & evidence, otherwise query DB
+  const claim =
+    options.preloadedClaim?.subjectEntity && options.preloadedClaim?.evidence
+      ? options.preloadedClaim
+      : await prisma.claim.findFirst({
+          where: { id: claimId, projectId },
+          include: {
+            subjectEntity: {
+              include: { aliases: true },
+            },
+            evidence: {
+              include: {
+                document: true,
+                chunk: true,
+              },
+            },
+          },
+        });
 
   if (!claim) {
     throw new AppError("NOT_FOUND", "Claim not found.", 404);
@@ -87,7 +136,7 @@ export async function verifyClaimService(
   let quoteSimilarity = 0;
   let quoteGateReason = "";
 
-  if (!sourceGatePassed || !primaryEvidence) {
+  if (!sourceGatePassed || !primaryEvidence || !primaryEvidence.chunk || !primaryEvidence.chunk.content) {
     quoteGatePassed = false;
     quoteSimilarity = 0;
     quoteGateReason = "Quote check skipped because source gate failed.";
@@ -122,32 +171,42 @@ export async function verifyClaimService(
       rawJudgeOutput: { skipped: true, reason: "gate1_or_gate2_failed" },
     };
   } else {
-    const semanticEval = await runSemanticJudge(
-      {
-        claim: {
-          subject: claim.subjectEntity.canonicalName,
-          attribute: claim.attributeKey,
-          value: claim.valueRaw,
-          category: claim.category,
+    // Check judge deduplication cache across the batch
+    const cacheKey = `${claim.subjectEntity.canonicalName}|${claim.attributeKey}|${claim.valueRaw}|${primaryEvidence.excerpt}`;
+    if (options.judgeCache && options.judgeCache.has(cacheKey)) {
+      judgeResult = options.judgeCache.get(cacheKey)!;
+    } else {
+      const semanticEval = await runSemanticJudge(
+        {
+          claim: {
+            subject: claim.subjectEntity.canonicalName,
+            attribute: claim.attributeKey,
+            value: claim.valueRaw,
+            category: claim.category,
+          },
+          excerpt: primaryEvidence.excerpt,
+          context: {
+            documentFileName: primaryEvidence.document?.fileName,
+            sectionTitle: primaryEvidence.chunk?.sectionTitle || undefined,
+            pageNumber: primaryEvidence.chunk?.pageNumber,
+            rowNumber: primaryEvidence.chunk?.rowStart,
+          },
         },
-        excerpt: primaryEvidence.excerpt,
-        context: {
-          documentFileName: primaryEvidence.document.fileName,
-          sectionTitle: primaryEvidence.chunk.sectionTitle || undefined,
-          pageNumber: primaryEvidence.chunk.pageNumber,
-          rowNumber: primaryEvidence.chunk.rowStart,
-        },
-      },
-      options.provider
-    );
+        options.provider
+      );
 
-    judgeResult = {
-      outcome: semanticEval.outcome,
-      reason: semanticEval.reason,
-      judgeModel: semanticEval.judgeModel,
-      judgePromptVersion: semanticEval.judgePromptVersion,
-      rawJudgeOutput: semanticEval.rawJudgeOutput,
-    };
+      judgeResult = {
+        outcome: semanticEval.outcome,
+        reason: semanticEval.reason,
+        judgeModel: semanticEval.judgeModel,
+        judgePromptVersion: semanticEval.judgePromptVersion,
+        rawJudgeOutput: semanticEval.rawJudgeOutput,
+      };
+
+      if (options.judgeCache) {
+        options.judgeCache.set(cacheKey, judgeResult);
+      }
+    }
   }
 
   // ==========================================
@@ -163,7 +222,7 @@ export async function verifyClaimService(
   });
 
   // Check if subject or alias is mentioned in excerpt
-  const aliasList = claim.subjectEntity.aliases.map((a) => a.alias);
+  const aliasList = (claim.subjectEntity.aliases as Array<{ alias: string }>).map((a) => a.alias);
   const subjectFoundInExcerpt = primaryEvidence
     ? checkEntityInText(
         claim.subjectEntity.canonicalName,
@@ -231,7 +290,7 @@ export async function verifyClaimService(
 }
 
 /**
- * Batch verifies all active claims in a project workspace.
+ * Batch verifies all active claims in a project workspace with bounded concurrency and request deduplication.
  */
 export async function verifyAllProjectClaimsService(
   projectId: string,
@@ -249,7 +308,17 @@ export async function verifyAllProjectClaimsService(
       reviewState: { not: "REJECTED" },
       supersededBy: { none: {} },
     },
-    select: { id: true },
+    include: {
+      subjectEntity: {
+        include: { aliases: true },
+      },
+      evidence: {
+        include: {
+          document: true,
+          chunk: true,
+        },
+      },
+    },
     orderBy: { createdAt: "asc" },
   });
 
@@ -262,12 +331,32 @@ export async function verifyAllProjectClaimsService(
     unknown: 0,
   };
 
-  const results = [];
+  const judgeCache = new Map<string, ClaimJudgeResult>();
+  const concurrency = Math.max(1, options.concurrency ?? 2);
+  const results: Array<Awaited<ReturnType<typeof verifyClaimService>>> = new Array(claims.length);
+  let currentIndex = 0;
 
-  for (const c of claims) {
-    const res = await verifyClaimService(projectId, c.id, options);
-    results.push(res);
+  async function worker() {
+    while (currentIndex < claims.length) {
+      const idx = currentIndex++;
+      const c = claims[idx];
+      results[idx] = await verifyClaimService(projectId, c.id, {
+        ...options,
+        preloadedClaim: c,
+        judgeCache,
+        skipAuthCheck: true,
+      });
+    }
+  }
 
+  const workerCount = Math.min(concurrency, claims.length);
+  if (workerCount > 0) {
+    const workers = Array.from({ length: workerCount }, () => worker());
+    await Promise.all(workers);
+  }
+
+  for (const res of results) {
+    if (!res) continue;
     switch (res.status) {
       case "VERIFIED":
         summary.verified++;

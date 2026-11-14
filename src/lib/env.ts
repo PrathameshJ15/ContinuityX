@@ -23,9 +23,9 @@ const envSchema = z.object({
     .string()
     .min(16, "NEXTAUTH_SECRET must be at least 16 characters")
     .default("continuityx-default-development-secret-key-32b"),
-  GEMINI_API_KEY: z.string().optional(),
-  GEMINI_EXTRACTION_MODEL: z.string().default("gemini-3.5-flash-lite"),
-  GEMINI_JUDGE_MODEL: z.string().default("gemini-3.5-flash"),
+  GROQ_API_KEY: z.string().optional(),
+  GROQ_EXTRACTION_MODEL: z.string().default("openai/gpt-oss-120b"),
+  GROQ_VERIFICATION_MODEL: z.string().default("openai/gpt-oss-20b"),
   MAX_DOCUMENT_SIZE_MB: z.coerce.number().int().positive().default(10),
   MAX_DOCUMENT_PAGES: z.coerce.number().int().positive().default(100),
   MAX_PROJECT_DOCUMENTS: z.coerce.number().int().positive().default(50),

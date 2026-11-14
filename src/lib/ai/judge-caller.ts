@@ -1,5 +1,5 @@
 import { env } from "@/lib/env";
-import { GeminiLLMProvider } from "./gemini-provider";
+import { GroqLLMProvider } from "./groq-provider";
 import {
   buildJudgePrompt,
   JUDGE_PROMPT_VERSION,
@@ -7,7 +7,7 @@ import {
   judgeOutputSchema,
   JudgePromptInput,
 } from "./prompts/judge-v1";
-import { LLMProvider } from "./provider";
+import { LLMProvider, executeWithRetryBackoff } from "./provider";
 
 export interface SemanticJudgeResult {
   outcome: "SUPPORTS" | "NEUTRAL" | "CONTRADICTS" | "INSUFFICIENT_CONTEXT" | "ERROR";
@@ -26,18 +26,25 @@ export async function runSemanticJudge(
   input: JudgePromptInput,
   provider?: LLMProvider
 ): Promise<SemanticJudgeResult> {
-  const llm = provider || new GeminiLLMProvider();
-  const judgeModel = env.GEMINI_JUDGE_MODEL || "gemini-3.5-flash";
+  const llm = provider || new GroqLLMProvider();
+  const judgeModel = env.GROQ_VERIFICATION_MODEL || "openai/gpt-oss-20b";
   const { systemPrompt, userPrompt } = buildJudgePrompt(input);
 
   const attemptEvaluation = async (): Promise<JudgeOutput> => {
-    const response = await llm.generateStructuredText({
-      model: judgeModel,
-      systemInstruction: systemPrompt,
-      userPrompt,
-      temperature: 0,
-      timeoutMs: 15000,
-    });
+    const response = await executeWithRetryBackoff(
+      () =>
+        llm.generateStructuredText({
+          model: judgeModel,
+          systemInstruction: systemPrompt,
+          userPrompt,
+          temperature: 0,
+          timeoutMs: 15000,
+        }),
+      {
+        maxAttempts: 3,
+        baseDelayMs: 1000,
+      }
+    );
 
     let parsed: unknown;
     try {

@@ -52,33 +52,34 @@ export function Modal({
   }[maxWidth];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-150">
       <div
         className={cn(
-          "w-full rounded-2xl border bg-card shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150",
+          "w-full rounded-2xl border bg-card shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150",
           maxWidthClass,
           className
         )}
       >
-        <div className="flex items-center justify-between border-b px-6 py-4 bg-muted/20">
+        <div className="flex items-center justify-between border-b px-4 sm:px-6 py-3 sm:py-4 bg-muted/20">
           <div>
             <h3 className="text-base font-bold tracking-tight text-foreground">{title}</h3>
             {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            aria-label="Close modal"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 text-xs text-foreground space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-5 text-xs text-foreground space-y-4">
           {children}
         </div>
 
         {footer && (
-          <div className="border-t bg-muted/20 px-6 py-3.5 flex items-center justify-end gap-2">
+          <div className="border-t bg-muted/20 px-4 sm:px-6 py-3 sm:py-3.5 flex flex-wrap items-center justify-end gap-2">
             {footer}
           </div>
         )}

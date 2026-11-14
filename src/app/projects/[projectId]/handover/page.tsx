@@ -109,7 +109,7 @@ export default function HandoverPage({
   const { projectId } = use(params);
 
   const [handoversList, setHandoversList] = useState<HandoverRecord[]>([]);
-  const [selectedVersion, setSelectedVersion] = useState<"DRAFT" | number>("DRAFT");
+  const [selectedVersion, setSelectedVersion] = useState<"DRAFT" | number | null>(null);
   const [draftData, setDraftData] = useState<{
     canApprove: boolean;
     blockingReasons: string[];
@@ -214,6 +214,7 @@ export default function HandoverPage({
   }, [loadHandovers]);
 
   useEffect(() => {
+    if (!selectedVersion) return;
     if (selectedVersion === "DRAFT") {
       loadDraft();
     } else {
@@ -326,7 +327,7 @@ export default function HandoverPage({
             <div className="flex items-center gap-1.5 bg-card border border-border rounded-lg px-2.5 py-1.5 shadow-xs">
               <History className="h-3.5 w-3.5 text-muted-foreground" />
               <select
-                value={selectedVersion}
+                value={selectedVersion ?? "DRAFT"}
                 onChange={(e) =>
                   setSelectedVersion(
                     e.target.value === "DRAFT" ? "DRAFT" : parseInt(e.target.value, 10)

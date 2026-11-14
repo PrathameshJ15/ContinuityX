@@ -29,7 +29,12 @@ export const metadata: Metadata = {
   description:
     "Reconstructs project truth from authorized documents, verifies claims with 4-gate evidence checks, and produces cryptographically sealed handovers.",
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
   },
   openGraph: {
     title: "ContinuityX — Intelligence That Keeps Projects Moving",

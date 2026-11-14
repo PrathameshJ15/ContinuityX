@@ -396,7 +396,7 @@ export default function ConflictsPage({
                         setResolutionAction("CHOOSE_A");
                         setResolutionReason("");
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-white px-3.5 py-1.5 text-xs font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer shrink-0"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-white px-3.5 py-1.5 min-h-[44px] text-xs font-semibold shadow-xs hover:bg-primary/90 transition-all cursor-pointer shrink-0"
                     >
                       <GitCompare className="h-3.5 w-3.5" />
                       Resolve Conflict
@@ -538,7 +538,7 @@ export default function ConflictsPage({
               <select
                 value={resolutionAction}
                 onChange={(e) => setResolutionAction(e.target.value)}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 min-h-[44px] text-[16px] sm:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
               >
                 <option value="CHOOSE_A">Choose Claim A (Reject Claim B)</option>
                 <option value="CHOOSE_B">Choose Claim B (Reject Claim A)</option>
@@ -558,7 +558,7 @@ export default function ConflictsPage({
                 value={resolutionReason}
                 onChange={(e) => setResolutionReason(e.target.value)}
                 placeholder="Explain why this resolution was chosen based on authoritative source evidence..."
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-[16px] sm:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
               />
             </div>
 
@@ -566,14 +566,14 @@ export default function ConflictsPage({
               <button
                 type="button"
                 onClick={() => setResolvingConflict(null)}
-                className="rounded-lg border border-border px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+                className="rounded-lg border border-border px-3.5 py-1.5 min-h-[44px] text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submittingResolution}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-colors disabled:opacity-40 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 min-h-[44px] text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-colors disabled:opacity-40 cursor-pointer"
               >
                 {submittingResolution && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Submit Resolution

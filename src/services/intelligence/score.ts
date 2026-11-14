@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireProjectAccess } from "@/lib/permissions";
+import { getCached, setCached } from "@/lib/cache";
 
 export interface MetricBreakdown {
   name: string;
@@ -52,7 +53,9 @@ export async function computeContinuityIntelligenceService(
 ): Promise<{ score: ContinuityScoreResult; busFactor: BusFactorMapResult }> {
   await requireProjectAccess(projectId, "project:read", userId);
 
-  // 1. Fetch independent project data in parallel (entities, claims, conflicts)
+  const cacheKey = `intel:${projectId}`;
+  const cached = getCached<{ score: ContinuityScoreResult; busFactor: BusFactorMapResult }>(cacheKey);
+  if (cached) return cached;
   const [entities, claims, openConflicts] = await Promise.all([
     // Project entities (excluding merged)
     prisma.entity.findMany({
@@ -339,8 +342,10 @@ export async function computeContinuityIntelligenceService(
     disclaimer: "Ownership-concentration indicator, not a statistical measure. Highlights modules where key knowledge rests with a single contributor.",
   };
 
-  return {
+  const result = {
     score: scoreResult,
     busFactor: busFactorResult,
   };
+  setCached(cacheKey, result, 30);
+  return result;
 }
