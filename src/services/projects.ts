@@ -172,7 +172,7 @@ export async function listMyProjectsService(page: number = 1, limit: number = 10
     },
   };
 
-  setCached(cacheKey, result, 30);
+  setCached(cacheKey, result, 180);
   return result;
 }
 
@@ -209,7 +209,7 @@ export async function getProjectService(projectId: string, explicitUserId?: stri
     throw new AppError("NOT_FOUND", "Project not found or you do not have permission to access it.", 404);
   }
 
-  setCached(cacheKey, project, 60);
+  setCached(cacheKey, project, 180);
 
   return {
     ...project,

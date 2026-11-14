@@ -564,7 +564,7 @@ export async function computeRadarAlertsService(
   }
 
   const result = { alerts: filteredAlerts, metrics };
-  setCached(cacheKey, result, 60);
+  setCached(cacheKey, result, 180);
   return result;
 }
 

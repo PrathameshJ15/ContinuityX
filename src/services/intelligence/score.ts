@@ -346,6 +346,6 @@ export async function computeContinuityIntelligenceService(
     score: scoreResult,
     busFactor: busFactorResult,
   };
-  setCached(cacheKey, result, 30);
+  setCached(cacheKey, result, 180);
   return result;
 }

@@ -165,11 +165,12 @@ export async function requireProjectAccess(
     role: membership.role,
   };
 
-  // Only cache in non-test / production mode or with 15s TTL
+  // Cache project access for 5 minutes (300s) to prevent remote DB round-trips
+  // Invalidated immediately on member role or project changes
   if (process.env.NODE_ENV !== "test") {
     accessCache.set(cacheKey, {
       context,
-      expiresAt: now + 15000,
+      expiresAt: now + 300000,
     });
   }
 

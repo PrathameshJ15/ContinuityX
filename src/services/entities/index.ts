@@ -48,7 +48,7 @@ export async function listEntitiesService(
     mergedCount: e._count.mergedEntities,
   }));
 
-  setCached(cacheKey, result, 60);
+  setCached(cacheKey, result, 180);
   return result;
 }
 

@@ -83,7 +83,9 @@ export function Sidebar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const projectId = currentProject?.id;
+  // Instantly resolve projectId from active URL pathname or currentProject
+  const pathProjectId = pathname?.match(/^\/projects\/([^/]+)/)?.[1];
+  const projectId = currentProject?.id || pathProjectId;
 
   const navGroups: NavGroup[] = projectId
     ? [
@@ -220,13 +222,13 @@ export function Sidebar({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[14px] font-heading font-bold text-ink truncate leading-tight">
-                  {currentProject ? currentProject.name : "ContinuityX Workspace"}
+                  {currentProject ? currentProject.name : (pathProjectId ? "Active Workspace" : "ContinuityX Workspace")}
                 </div>
                 <div className="text-[12px] text-faint flex items-center gap-1 mt-0.5">
                   <span className="truncate">
                     {currentProject
                       ? `Active Project · ${currentProject.currentUserRole}`
-                      : "Workspace Hub"}
+                      : (pathProjectId ? "Enterprise Workspace" : "Workspace Hub")}
                   </span>
                 </div>
               </div>

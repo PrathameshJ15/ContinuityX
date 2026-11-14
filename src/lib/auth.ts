@@ -106,7 +106,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
       if (user && process.env.NODE_ENV !== "test") {
         userSessionCache.set(payload.id, {
           user,
-          expiresAt: now + 30000,
+          expiresAt: now + 300000,
         });
       }
       return user;

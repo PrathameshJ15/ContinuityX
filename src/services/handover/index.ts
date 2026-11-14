@@ -152,7 +152,7 @@ export async function getHandoverDraftPreviewService(
     unresolvedConflictCount: openConflicts.length,
     draft: assembled,
   };
-  setCached(cacheKey, result, 60);
+  setCached(cacheKey, result, 180);
   return result;
 }
 

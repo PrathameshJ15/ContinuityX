@@ -539,7 +539,7 @@ export async function listDocumentsService(
     },
   };
 
-  setCached(cacheKey, result, 60);
+  setCached(cacheKey, result, 180);
   return result;
 }
 

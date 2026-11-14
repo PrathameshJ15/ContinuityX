@@ -4,6 +4,7 @@ import { requireProjectAccess } from "@/lib/permissions";
 import { writeAudit } from "@/lib/audit";
 import { AppError } from "@/lib/api-response";
 import { isControlledAttributeKey, normalizeClaimValue } from "@/lib/ai/vocabulary";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 
 export interface ListClaimsFilters {
   page?: number;
@@ -29,6 +30,12 @@ export async function listClaimsService(
   const safePage = Math.max(1, Number.isFinite(filters.page) ? Number(filters.page) : 1);
   const safeLimit = Math.min(50, Math.max(1, Number.isFinite(filters.limit) ? Number(filters.limit) : 20));
   const skip = (safePage - 1) * safeLimit;
+
+  const cacheKey = `claims:${projectId}:${JSON.stringify(filters)}:${safePage}:${safeLimit}`;
+  const cached = getCached<unknown>(cacheKey);
+  if (cached) {
+    return cached as { claims: unknown[]; pagination: unknown };
+  }
 
   const where: Prisma.ClaimWhereInput = {
     projectId,
@@ -92,7 +99,7 @@ export async function listClaimsService(
     }),
   ]);
 
-  return {
+  const result = {
     claims,
     pagination: {
       page: safePage,
@@ -101,6 +108,9 @@ export async function listClaimsService(
       totalPages: Math.max(1, Math.ceil(total / safeLimit)),
     },
   };
+
+  setCached(cacheKey, result, 180);
+  return result;
 }
 
 export async function getClaimService(
@@ -280,6 +290,8 @@ export async function editCandidateClaimService(
   } catch {
     // Non-blocking: will be picked up in review queue / verify batch
   }
+
+  invalidateCache(projectId);
 
   return nextClaim;
 }

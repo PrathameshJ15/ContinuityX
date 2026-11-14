@@ -105,7 +105,7 @@ export async function GET(
     };
 
     const payload = { conflicts, totalProjectClaims, counts };
-    setCached(cacheKey, payload, 60);
+    setCached(cacheKey, payload, 180);
 
     const duration = performance.now() - startTime;
     console.log(`[API Timing] GET /api/projects/${projectId}/conflicts completed in ${duration.toFixed(2)} ms`);
