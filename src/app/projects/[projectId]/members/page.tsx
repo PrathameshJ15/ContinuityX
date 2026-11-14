@@ -249,7 +249,7 @@ export default function MembersPage({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="colleague@example.com"
-                className="w-full rounded-lg border border-border bg-card px-3.5 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                className="w-full rounded-lg border border-border bg-card px-3.5 py-2 min-h-[44px] text-[16px] sm:text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
               />
             </div>
 
@@ -261,7 +261,7 @@ export default function MembersPage({
                 id="memberRole"
                 value={role}
                 onChange={(e) => setRole(e.target.value as "OWNER" | "REVIEWER" | "VIEWER")}
-                className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
+                className="w-full rounded-lg border border-border bg-card px-3 py-2 min-h-[44px] text-[16px] sm:text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
               >
                 <option value="VIEWER">{formatRoleLabel("VIEWER")}</option>
                 <option value="REVIEWER">{formatRoleLabel("REVIEWER")}</option>
@@ -272,7 +272,7 @@ export default function MembersPage({
             <button
               type="submit"
               disabled={submitting || !email.trim()}
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-all disabled:opacity-40 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 min-h-[44px] text-xs font-semibold text-white shadow-xs hover:bg-primary/90 transition-all disabled:opacity-40 cursor-pointer"
             >
               {submitting ? (
                 <>

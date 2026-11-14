@@ -67,15 +67,15 @@ async function main() {
   }
 
   const documentsText = await collectDevDocumentsText();
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const apiKey = process.env.GROQ_API_KEY?.trim();
 
   if (!apiKey) {
-    console.log("[Baseline] Skipped: GEMINI_API_KEY is not configured.");
+    console.log("[Baseline] Skipped: GROQ_API_KEY is not configured.");
     console.log(`[Baseline] Parsed ${DEV_FILES.length} DEV documents successfully.`);
     return;
   }
 
-  const model = process.env.GEMINI_EXTRACTION_MODEL?.trim() || "gemini-3.5-flash-lite";
+  const model = process.env.GROQ_EXTRACTION_MODEL?.trim() || "openai/gpt-oss-120b";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
     model,
   )}:generateContent`;

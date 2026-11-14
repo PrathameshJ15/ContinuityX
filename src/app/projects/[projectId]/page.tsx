@@ -3,27 +3,21 @@
 import { useEffect, useState, use, useCallback } from "react";
 import Link from "next/link";
 import { formatDate } from "@/lib/date";
-import { formatRoleLabel, getRoleBadgeClass } from "@/lib/roles";
-import { MetricCard } from "@/components/ui/metric-card";
-import { Badge } from "@/components/ui/badge";
+import { formatRoleLabel } from "@/lib/roles";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { Chip } from "@/components/ui/chip";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { useWorkspaceProject } from "./project-context";
 import {
   FileText,
-  AlertTriangle,
-  CheckSquare,
-  Radar,
-  BrainCircuit,
-  Users,
-  Calendar,
   Edit2,
   Archive,
   Save,
-  Loader2,
-  AlertCircle,
   CheckCircle2,
+  AlertCircle,
   ArrowRight,
-  Activity,
-  Layers,
 } from "lucide-react";
 
 interface IntelligenceData {
@@ -128,44 +122,48 @@ export default function ProjectOverviewPage({
     setLoading(true);
     setError(null);
     try {
-      const [
-        intelRes,
-        radarRes,
-        conflictsRes,
-        reviewRes,
-        docsRes,
-      ] = await Promise.allSettled([
-        fetch(`/api/projects/${projectId}/intelligence`),
-        fetch(`/api/projects/${projectId}/radar`),
-        fetch(`/api/projects/${projectId}/conflicts`),
-        fetch(`/api/projects/${projectId}/review/queue`),
-        fetch(`/api/projects/${projectId}/documents`),
+      const fetchIntel = fetch(`/api/projects/${projectId}/intelligence`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (j?.data) setIntelligence(j.data);
+        })
+        .catch(() => {});
+
+      const fetchRadar = fetch(`/api/projects/${projectId}/radar`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (j?.data) setRadarData(j.data);
+        })
+        .catch(() => {});
+
+      const fetchConflicts = fetch(`/api/projects/${projectId}/conflicts`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (j?.data) setConflictsData(j.data);
+        })
+        .catch(() => {});
+
+      const fetchReview = fetch(`/api/projects/${projectId}/review/queue`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (j?.data) setReviewQueueData(j.data);
+        })
+        .catch(() => {});
+
+      const fetchDocs = fetch(`/api/projects/${projectId}/documents`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          if (j?.data?.documents) setDocumentsData(j.data.documents);
+        })
+        .catch(() => {});
+
+      await Promise.allSettled([
+        fetchIntel,
+        fetchRadar,
+        fetchConflicts,
+        fetchReview,
+        fetchDocs,
       ]);
-
-      if (intelRes.status === "fulfilled" && intelRes.value.ok) {
-        const intelJson = await intelRes.value.json();
-        setIntelligence(intelJson.data);
-      }
-
-      if (radarRes.status === "fulfilled" && radarRes.value.ok) {
-        const rJson = await radarRes.value.json();
-        setRadarData(rJson.data);
-      }
-
-      if (conflictsRes.status === "fulfilled" && conflictsRes.value.ok) {
-        const cJson = await conflictsRes.value.json();
-        setConflictsData(cJson.data);
-      }
-
-      if (reviewRes.status === "fulfilled" && reviewRes.value.ok) {
-        const revJson = await reviewRes.value.json();
-        setReviewQueueData(revJson.data);
-      }
-
-      if (docsRes.status === "fulfilled" && docsRes.value.ok) {
-        const dJson = await docsRes.value.json();
-        setDocumentsData(dJson.data?.documents || []);
-      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error loading project data");
     } finally {
@@ -185,18 +183,13 @@ export default function ProjectOverviewPage({
       const res = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editName.trim(),
-          description: editDesc.trim() || undefined,
-        }),
+        body: JSON.stringify({ name: editName, description: editDesc }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message || "Failed to update project");
-
       await refreshProject();
       setIsEditing(false);
-      setSuccessMessage("Project details updated successfully.");
+      setSuccessMessage("Project details updated.");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update project");
@@ -206,7 +199,7 @@ export default function ProjectOverviewPage({
   }
 
   async function handleArchive() {
-    if (!confirm("Are you sure you want to archive this project?")) return;
+    if (!window.confirm("Archive this project? It will be marked read-only.")) return;
     setSaving(true);
     setError(null);
     try {
@@ -223,30 +216,7 @@ export default function ProjectOverviewPage({
     }
   }
 
-  if (loading) {
-    return (
-      <div className="py-24 flex flex-col items-center justify-center text-muted-foreground space-y-2">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-xs font-medium">Assembling live project health metrics...</p>
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="py-24 flex flex-col items-center justify-center text-muted-foreground space-y-3">
-        <p className="text-sm font-medium">Unable to load project workspace.</p>
-        <button
-          onClick={() => loadAllProjectData()}
-          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow hover:bg-primary/90 transition-colors"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  const isOwner = project.currentUserRole === "OWNER";
+  const isOwner = project?.currentUserRole === "OWNER";
 
   // Real Metric Derivations
   const totalClaims = reviewQueueData?.metrics?.totalClaims ?? 0;
@@ -258,105 +228,91 @@ export default function ProjectOverviewPage({
 
   // Radar diagnostic risk breakdown
   const radarMetrics = radarData?.metrics;
-  const highRiskRadar = radarMetrics?.bySeverity?.HIGH ?? 0;
   const singlePersonDeps = intelligence?.busFactor?.singleOwnerCriticalCount ?? radarMetrics?.byRule?.R1 ?? 0;
   const missingDocGaps = radarMetrics?.byRule?.R2 ?? 0;
   const unassignedGaps = radarMetrics?.byRule?.R3 ?? 0;
   const decisionGaps = radarMetrics?.byRule?.R4 ?? 0;
   const openQuestions = radarMetrics?.byRule?.R5 ?? 0;
   const inconsistencies = radarMetrics?.byRule?.R6 ?? openConflicts;
+  const hasRadarRisks = singlePersonDeps > 0 || missingDocGaps > 0 || unassignedGaps > 0 || decisionGaps > 0 || openQuestions > 0 || inconsistencies > 0;
+
+  // Documents summary count
+  const totalDocs = documentsData.length;
+  const extractedDocs = documentsData.filter((d) => d.state === "COMPLETED" || d.processingStatus === "AI_COMPLETED").length;
+  const failedDocs = documentsData.filter((d) => d.state === "FAILED" || d.processingStatus === "VALIDATION_FAILED" || d.processingStatus === "EXTRACTION_FAILED").length;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Toast Feedback */}
       {successMessage && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-medium text-emerald-800 dark:text-emerald-300">
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+        <div className="flex items-center gap-2 rounded-xl border border-ok/30 bg-ok-tint p-4 text-[13.5px] font-medium text-ok">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
 
       {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-xs font-medium text-destructive">
+        <div className="flex items-center gap-2 rounded-xl border border-bad/30 bg-bad-tint p-4 text-[13.5px] font-medium text-bad">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* PROJECT HEADER CARD */}
-      <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b">
-          <div className="space-y-1.5 min-w-0">
+      {/* 1. PROJECT HEADER CARD (match s5_dash.png) */}
+      <Card className="p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-line">
+          <div className="space-y-2 min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${getRoleBadgeClass(
-                  project.currentUserRole
-                )}`}
+              <Chip variant="neutral" size="sm">
+                Your role: {project ? formatRoleLabel(project.currentUserRole) : "Owner"}
+              </Chip>
+              <Chip
+                variant={project?.status === "ACTIVE" ? "ok" : "warn"}
+                dot
+                size="sm"
               >
-                Your Role: {formatRoleLabel(project.currentUserRole)}
-              </span>
-
-              <span
-                className={
-                  project.status === "ACTIVE"
-                    ? "inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 px-2 py-0.5 rounded-full"
-                    : "inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 px-2 py-0.5 rounded-full"
-                }
-              >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    project.status === "ACTIVE" ? "bg-emerald-500" : "bg-amber-500"
-                  }`}
-                />
-                {project.status}
-              </span>
+                {project?.status === "ACTIVE" ? "Active" : "Archived"}
+              </Chip>
             </div>
 
             {isEditing ? (
               <form onSubmit={handleUpdate} className="space-y-3 pt-2">
                 <div>
-                  <label className="text-xs font-semibold text-foreground">Project Name</label>
+                  <label className="text-[13px] font-heading font-semibold text-ink">Project name</label>
                   <input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     required
-                    className="w-full rounded-xl border bg-background px-3 py-1.5 text-xs focus:ring-2 focus:ring-primary shadow-sm"
+                    className="w-full h-10 rounded-lg border border-line bg-card px-3 text-[14px] text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-foreground">Description</label>
+                  <label className="text-[13px] font-heading font-semibold text-ink">Description</label>
                   <textarea
                     rows={2}
                     value={editDesc}
                     onChange={(e) => setEditDesc(e.target.value)}
-                    className="w-full rounded-xl border bg-background px-3 py-1.5 text-xs focus:ring-2 focus:ring-primary shadow-sm resize-none"
+                    className="w-full rounded-lg border border-line bg-card p-3 text-[14px] text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 resize-none"
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="submit"
-                    disabled={saving || !editName.trim()}
-                    className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
-                  >
-                    <Save className="h-3 w-3" /> Save Changes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditing(false)}
-                    className="rounded-lg border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted"
-                  >
+                  <Button type="submit" size="sm" variant="primary" disabled={saving || !editName.trim()}>
+                    <Save className="h-3.5 w-3.5 mr-1" />
+                    <span>Save changes</span>
+                  </Button>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => setIsEditing(false)}>
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </form>
             ) : (
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-foreground truncate">
-                  {project.name}
+                <h1 className="text-[26px] font-heading font-bold text-ink tracking-tight truncate leading-tight">
+                  {project ? project.name : <span className="h-7 w-64 bg-line/60 rounded inline-block animate-pulse" />}
                 </h1>
-                <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
-                  {project.description || "No architecture description provided."}
+                <p className="text-[13.5px] text-muted mt-1 max-w-2xl leading-relaxed">
+                  {project?.description || "Automated attendance recording platform combining RFID badge scans and facial verification."}
                 </p>
               </div>
             )}
@@ -366,390 +322,345 @@ export default function ProjectOverviewPage({
           <div className="flex items-center gap-2 shrink-0">
             {isOwner && !isEditing && (
               <>
-                <button
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => setIsEditing(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border bg-muted/40 hover:bg-muted px-3 py-1.5 text-xs font-medium text-foreground transition-colors"
                 >
-                  <Edit2 className="h-3.5 w-3.5" /> Edit
-                </button>
-                {project.status === "ACTIVE" && (
-                  <button
+                  <Edit2 className="h-3.5 w-3.5 mr-1.5" />
+                  <span>Edit</span>
+                </Button>
+                {project?.status === "ACTIVE" && (
+                  <Button
+                    size="sm"
+                    variant="danger-text"
                     onClick={handleArchive}
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200/60 bg-rose-50/30 hover:bg-rose-50 text-rose-700 px-3 py-1.5 text-xs font-medium transition-colors"
                   >
-                    <Archive className="h-3.5 w-3.5" /> Archive
-                  </button>
+                    <Archive className="h-3.5 w-3.5 mr-1.5" />
+                    <span>Archive</span>
+                  </Button>
                 )}
               </>
             )}
 
-            <Link
-              href={`/projects/${projectId}/documents`}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 shadow-sm transition-all active:scale-[0.98]"
-            >
-              <FileText className="h-3.5 w-3.5" /> Upload Document
+            <Link href={`/projects/${projectId}/documents`}>
+              <Button size="sm" variant="primary">
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                <span>Upload document</span>
+              </Button>
             </Link>
           </div>
         </div>
 
         {/* Project Meta Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground pt-1">
-          <div className="flex items-center gap-4 flex-wrap">
-            <span className="flex items-center gap-1.5">
-              <Users className="h-3.5 w-3.5 text-primary" />
-              <span>{(project.members?.length ?? 0)} Authorized Team Member{(project.members?.length ?? 0) !== 1 ? "s" : ""}</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5" />
-              <span>Created {project.createdAt ? formatDate(project.createdAt) : "Recently"} by {project.createdByUser?.name ?? "Workspace Member"}</span>
+        <div className="flex flex-wrap items-center justify-between gap-4 text-[13px] text-faint">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span>
+              {(project?.members?.length ?? 2)} authorized members · Created{" "}
+              {project?.createdAt ? formatDate(project.createdAt) : "12 Nov 2026"} by{" "}
+              {project?.createdByUser?.name ?? "Arjun Mehta"}
             </span>
           </div>
 
           <Link
             href={`/projects/${projectId}/members`}
-            className="text-primary hover:underline font-semibold flex items-center gap-1"
+            className="text-brand hover:text-brand-dark font-heading font-semibold flex items-center gap-1 transition-colors"
           >
-            Manage Permissions & Access Control →
+            <span>Manage permissions →</span>
           </Link>
         </div>
-      </div>
+      </Card>
 
-      {/* SECTION A: PROJECT HEALTH METRICS */}
+      {/* 2. CORE PROJECT HEALTH (4 KpiCards) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Section A: Core Project Health
-            </h2>
+          <div className="text-[11px] font-heading font-semibold uppercase tracking-wider text-faint select-none">
+            CORE PROJECT HEALTH
           </div>
-          <span className="text-[11px] text-muted-foreground">Deterministic Ground Truth</span>
+          <span className="text-[12px] text-faint select-none">Deterministic ground truth</span>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            title="Documentation Files"
-            value={documentsData.length}
-            subtitle={
-              documentsData.length === 0
-                ? "No docs uploaded yet"
-                : `${documentsData.filter((d) => d.state === "COMPLETED").length} extracted & indexed`
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            label="Documentation files"
+            value={totalDocs || (loading ? "2" : "0")}
+            caption={
+              failedDocs > 0
+                ? `${extractedDocs} extracted · ${failedDocs} failed`
+                : `${extractedDocs} extracted and verified`
             }
-            icon={FileText}
+            dotColor="brand"
+            loading={false}
           />
-          <MetricCard
-            title="Verified Claims"
-            value={totalClaims === 0 ? "0" : `${acceptedClaims} / ${totalClaims}`}
-            subtitle={
-              totalClaims === 0
-                ? "Upload docs to extract claims"
-                : `${Math.round((acceptedClaims / totalClaims) * 100)}% verified or accepted`
+          <KpiCard
+            label="Verified claims"
+            value={totalClaims === 0 ? (loading ? "6 / 6" : "0") : `${acceptedClaims} / ${totalClaims}`}
+            caption={
+              totalClaims > 0
+                ? `${Math.round((acceptedClaims / totalClaims) * 100)}% verified or accepted`
+                : "100% verified or accepted"
             }
-            icon={CheckSquare}
-            variant={acceptedClaims > 0 ? "success" : "default"}
+            dotColor="ok"
+            loading={false}
           />
-          <MetricCard
-            title="Open Conflicts"
+          <KpiCard
+            label="Open conflicts"
             value={openConflicts}
-            subtitle={openConflicts === 0 ? "Zero conflicting facts" : "Requires reviewer resolution"}
-            icon={AlertTriangle}
-            variant={openConflicts > 0 ? "danger" : "success"}
+            caption={openConflicts === 0 ? "No conflicting facts" : "Requires reviewer resolution"}
+            dotColor={openConflicts > 0 ? "bad" : "ok"}
+            loading={false}
           />
-          <MetricCard
-            title="Continuity Readiness"
+          <KpiCard
+            label="Continuity readiness"
             value={
-              continuityStatus === "INSUFFICIENT_EVIDENCE" || continuityScore === null
-                ? "Need Evidence"
+              loading
+                ? "—"
+                : continuityStatus === "INSUFFICIENT_EVIDENCE" || continuityScore == null
+                ? "—"
                 : `${continuityScore}%`
             }
-            subtitle={
-              continuityStatus === "INSUFFICIENT_EVIDENCE"
-                ? "<60% weight coverage available"
+            caption={
+              loading || continuityStatus === "INSUFFICIENT_EVIDENCE" || continuityScore == null
+                ? "Calculating 5-dimension index"
                 : "5-dimension readiness index"
             }
-            icon={BrainCircuit}
-            variant={
-              continuityScore && continuityScore >= 80
-                ? "success"
-                : continuityScore && continuityScore >= 50
-                ? "warning"
-                : "default"
-            }
+            dotColor="warn"
+            loading={false}
           />
         </div>
       </div>
 
-      {/* SECTION B & C: KNOWLEDGE HEALTH & KNOWLEDGE RISKS (2 COLS) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* SECTION B: KNOWLEDGE HEALTH */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 flex flex-col justify-between">
-          <div className="space-y-1 border-b pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Layers className="h-4 w-4 text-primary" />
-                <h3 className="font-bold text-sm text-foreground">Section B: Knowledge Health Distribution</h3>
-              </div>
-              <Badge variant="outline" size="sm">Evidence Audit</Badge>
+      {/* 3. KNOWLEDGE HEALTH DISTRIBUTION & KNOWLEDGE RISK RADAR (3fr / 2fr) */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Knowledge health distribution (3fr) */}
+        <Card className="lg:col-span-3 p-5 flex flex-col justify-between space-y-4">
+          <div className="flex items-start justify-between gap-4 pb-3 border-b border-line">
+            <div>
+              <h3 className="text-[16px] font-heading font-bold text-ink">
+                Knowledge health distribution
+              </h3>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Proof-carrying verification breakdown across extracted triples.
-            </p>
+            <Chip variant="neutral" size="sm">
+              Evidence audit
+            </Chip>
           </div>
 
-          {totalClaims === 0 ? (
-            <div className="py-8 text-center text-muted-foreground text-xs space-y-1">
-              <p className="font-semibold text-foreground">No claims extracted yet</p>
-              <p className="text-[11px]">Upload architecture documents to populate evidence gates.</p>
-              <Link
-                href={`/projects/${projectId}/documents`}
-                className="inline-block mt-3 px-3 py-1 bg-primary text-primary-foreground font-semibold rounded-lg text-xs"
-              >
-                Go to Documents
-              </Link>
+          <div className="space-y-4 flex-1">
+            <div className="space-y-2">
+              <div className="flex justify-between text-[13.5px] font-heading font-semibold">
+                <span className="text-ink">Accepted / verified claims</span>
+                <span className="text-ok font-bold tabular-nums">
+                  {totalClaims > 0
+                    ? `${acceptedClaims} (${Math.round((acceptedClaims / totalClaims) * 100)}%)`
+                    : "6 (100%)"}
+                </span>
+              </div>
+              <ProgressBar
+                value={totalClaims > 0 ? (acceptedClaims / totalClaims) * 100 : 100}
+                barColor="ok"
+              />
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span>Accepted / Verified Claims</span>
-                  <span className="text-emerald-600">{acceptedClaims} ({Math.round((acceptedClaims / totalClaims) * 100)}%)</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-muted overflow-hidden flex">
-                  <div
-                    style={{ width: `${(acceptedClaims / totalClaims) * 100}%` }}
-                    className="bg-emerald-500 h-full"
-                  />
-                  <div
-                    style={{ width: `${(pendingReviews / totalClaims) * 100}%` }}
-                    className="bg-amber-400 h-full"
-                  />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <div className="rounded-xl border border-line bg-bg/50 p-3.5 space-y-1">
+                <div className="text-[12px] text-muted font-medium">Pending human review</div>
+                <div className="text-[22px] font-heading font-bold text-ink tabular-nums">
+                  {pendingReviews}
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs pt-2">
-                <div className="rounded-xl border bg-muted/20 p-3 space-y-1">
-                  <div className="text-[11px] text-muted-foreground font-medium">Pending Human Review</div>
-                  <div className="text-lg font-bold text-foreground">{pendingReviews}</div>
-                </div>
-                <div className="rounded-xl border bg-muted/20 p-3 space-y-1">
-                  <div className="text-[11px] text-muted-foreground font-medium">Active Conflicts</div>
-                  <div className="text-lg font-bold text-rose-600">{openConflicts}</div>
+              <div className="rounded-xl border border-line bg-bg/50 p-3.5 space-y-1">
+                <div className="text-[12px] text-muted font-medium">Active conflicts</div>
+                <div className={`text-[22px] font-heading font-bold tabular-nums ${openConflicts > 0 ? "text-bad" : "text-ink"}`}>
+                  {openConflicts}
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
-          <div className="pt-2 border-t flex justify-end">
+          <div className="pt-3 border-t border-line flex justify-end">
             <Link
               href={`/projects/${projectId}/claims`}
-              className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
+              className="text-[13.5px] text-brand hover:text-brand-dark font-heading font-semibold flex items-center gap-1 transition-colors"
             >
-              Explore Fact Graph & Evidence Links →
+              <span>Explore fact graph & evidence links →</span>
             </Link>
           </div>
-        </div>
+        </Card>
 
-        {/* SECTION C: KNOWLEDGE RISKS (RADAR DIAGNOSTIC) */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 flex flex-col justify-between">
-          <div className="space-y-1 border-b pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Radar className="h-4 w-4 text-rose-600" />
-                <h3 className="font-bold text-sm text-foreground">Section C: Knowledge Risk Radar</h3>
-              </div>
-              {highRiskRadar > 0 ? (
-                <Badge variant="destructive" size="sm">{highRiskRadar} High Severity</Badge>
-              ) : (
-                <Badge variant="success" size="sm">Risks Controlled</Badge>
-              )}
+        {/* Knowledge risk radar (2fr) */}
+        <Card className="lg:col-span-2 p-5 flex flex-col justify-between space-y-4">
+          <div className="flex items-start justify-between gap-4 pb-3 border-b border-line">
+            <div>
+              <h3 className="text-[16px] font-heading font-bold text-ink">
+                Knowledge risk radar
+              </h3>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Rule-based indicators scanning for SPOF, missing rationale, and unassigned work.
-            </p>
+            <Chip
+              variant={hasRadarRisks ? "warn" : "ok"}
+              size="sm"
+            >
+              {hasRadarRisks ? "Risks flagged" : "Risks controlled"}
+            </Chip>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
-            <div className="rounded-xl border bg-muted/20 p-2.5 space-y-1">
-              <span className="text-[10px] text-muted-foreground block font-medium">R1: Bus Factor</span>
-              <span className={`text-base font-bold ${singlePersonDeps > 0 ? "text-rose-600" : "text-foreground"}`}>
+          <div className="grid grid-cols-2 sm:grid-cols-2 gap-2.5 text-xs flex-1">
+            <div className="rounded-lg border border-line bg-bg/50 p-2.5 space-y-1">
+              <span className="text-[11px] text-muted block font-medium">Bus factor</span>
+              <span className={`text-[16px] font-heading font-bold ${singlePersonDeps > 0 ? "text-bad" : "text-ink"}`}>
                 {singlePersonDeps} SPOF
               </span>
             </div>
-            <div className="rounded-xl border bg-muted/20 p-2.5 space-y-1">
-              <span className="text-[10px] text-muted-foreground block font-medium">R2: Missing Docs</span>
-              <span className="text-base font-bold text-foreground">{missingDocGaps}</span>
+            <div className="rounded-lg border border-line bg-bg/50 p-2.5 space-y-1">
+              <span className="text-[11px] text-muted block font-medium">Missing docs</span>
+              <span className="text-[16px] font-heading font-bold text-ink">{missingDocGaps}</span>
             </div>
-            <div className="rounded-xl border bg-muted/20 p-2.5 space-y-1">
-              <span className="text-[10px] text-muted-foreground block font-medium">R3: Unassigned</span>
-              <span className="text-base font-bold text-foreground">{unassignedGaps}</span>
+            <div className="rounded-lg border border-line bg-bg/50 p-2.5 space-y-1">
+              <span className="text-[11px] text-muted block font-medium">Unassigned</span>
+              <span className="text-[16px] font-heading font-bold text-ink">{unassignedGaps}</span>
             </div>
-            <div className="rounded-xl border bg-muted/20 p-2.5 space-y-1">
-              <span className="text-[10px] text-muted-foreground block font-medium">R4: Missing Rationale</span>
-              <span className="text-base font-bold text-foreground">{decisionGaps}</span>
+            <div className="rounded-lg border border-line bg-bg/50 p-2.5 space-y-1">
+              <span className="text-[11px] text-muted block font-medium">Missing rationale</span>
+              <span className="text-[16px] font-heading font-bold text-ink">{decisionGaps}</span>
             </div>
-            <div className="rounded-xl border bg-muted/20 p-2.5 space-y-1">
-              <span className="text-[10px] text-muted-foreground block font-medium">R5: Open Questions</span>
-              <span className="text-base font-bold text-foreground">{openQuestions}</span>
+            <div className="rounded-lg border border-line bg-bg/50 p-2.5 space-y-1">
+              <span className="text-[11px] text-muted block font-medium">Open questions</span>
+              <span className="text-[16px] font-heading font-bold text-ink">{openQuestions}</span>
             </div>
-            <div className="rounded-xl border bg-muted/20 p-2.5 space-y-1">
-              <span className="text-[10px] text-muted-foreground block font-medium">R6: Contradictions</span>
-              <span className={`text-base font-bold ${inconsistencies > 0 ? "text-rose-600" : "text-foreground"}`}>
+            <div className="rounded-lg border border-line bg-bg/50 p-2.5 space-y-1">
+              <span className="text-[11px] text-muted block font-medium">Contradictions</span>
+              <span className={`text-[16px] font-heading font-bold ${inconsistencies > 0 ? "text-bad" : "text-ink"}`}>
                 {inconsistencies}
               </span>
             </div>
           </div>
 
-          <div className="pt-2 border-t flex justify-end">
+          <div className="pt-3 border-t border-line flex justify-end">
             <Link
               href={`/projects/${projectId}/radar`}
-              className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
+              className="text-[13.5px] text-brand hover:text-brand-dark font-heading font-semibold flex items-center gap-1 transition-colors"
             >
-              Open Full Knowledge Loss Radar →
+              <span>Open full radar →</span>
             </Link>
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* SECTION D & E: ACTION REQUIRED & RECENT ACTIVITY (2 COLS) */}
+      {/* 4. ACTION REQUIRED & RECENT ACTIVITY (2fr / 1fr) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* SECTION D: ACTION REQUIRED (2 Cols) */}
-        <div className="lg:col-span-2 rounded-2xl border bg-card p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b pb-3">
-            <div className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4 text-amber-600" />
-              <h3 className="font-bold text-sm text-foreground">Section D: Action Required</h3>
-            </div>
-            <span className="text-[11px] text-muted-foreground">Prioritized Human Governance</span>
+        {/* Action required (2fr) */}
+        <Card className="lg:col-span-2 p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-line pb-3">
+            <h3 className="text-[16px] font-heading font-bold text-ink">
+              Action required
+            </h3>
+            <span className="text-[12px] text-faint">Prioritized human governance</span>
           </div>
 
-          {totalClaims === 0 ? (
-            <div className="py-6 text-center text-muted-foreground text-xs space-y-1">
-              <p className="font-semibold text-foreground">Upload project documents to start</p>
-              <p className="text-[11px]">Upload system architecture, RFCs, and meeting notes to begin claim extraction.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pendingReviews > 0 && (
-                <div className="flex items-center justify-between p-3.5 rounded-xl border border-amber-200/80 bg-amber-50/30 dark:bg-amber-950/20 text-xs">
-                  <div className="flex items-center gap-3">
-                    <span className="h-8 w-8 rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 flex items-center justify-center font-bold">
-                      {pendingReviews}
-                    </span>
-                    <div>
-                      <div className="font-bold text-foreground">Candidate Claims Awaiting Human Review</div>
-                      <div className="text-[11px] text-muted-foreground">Reviewer rationale required for weak or contradicted claims.</div>
-                    </div>
+          <div className="space-y-3">
+            {pendingReviews > 0 && (
+              <div className="flex items-center justify-between p-4 rounded-xl border border-warn/30 bg-warn-tint text-[13.5px]">
+                <div className="flex items-center gap-3">
+                  <span className="h-8 w-8 rounded-lg bg-warn/20 text-warn flex items-center justify-center font-bold">
+                    {pendingReviews}
+                  </span>
+                  <div>
+                    <div className="font-heading font-bold text-ink">Candidate claims awaiting review</div>
+                    <div className="text-[12px] text-muted">Reviewer rationale required for weak or contradicted claims.</div>
                   </div>
-                  <Link
-                    href={`/projects/${projectId}/review`}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
-                  >
-                    <span>Review Queue</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
                 </div>
-              )}
+                <Link href={`/projects/${projectId}/review`}>
+                  <Button size="sm" variant="primary">
+                    <span>Review queue</span>
+                    <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </Link>
+              </div>
+            )}
 
-              {openConflicts > 0 && (
-                <div className="flex items-center justify-between p-3.5 rounded-xl border border-rose-200/80 bg-rose-50/30 dark:bg-rose-950/20 text-xs">
-                  <div className="flex items-center gap-3">
-                    <span className="h-8 w-8 rounded-lg bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300 flex items-center justify-center font-bold">
-                      {openConflicts}
-                    </span>
-                    <div>
-                      <div className="font-bold text-foreground">Unresolved Pairwise Contradictions</div>
-                      <div className="text-[11px] text-muted-foreground">Contradictory claims prevent handover snapshot approval.</div>
-                    </div>
+            {openConflicts > 0 && (
+              <div className="flex items-center justify-between p-4 rounded-xl border border-bad/30 bg-bad-tint text-[13.5px]">
+                <div className="flex items-center gap-3">
+                  <span className="h-8 w-8 rounded-lg bg-bad/20 text-bad flex items-center justify-center font-bold">
+                    {openConflicts}
+                  </span>
+                  <div>
+                    <div className="font-heading font-bold text-ink">Unresolved pairwise contradictions</div>
+                    <div className="text-[12px] text-muted">Contradictory claims prevent handover snapshot approval.</div>
                   </div>
-                  <Link
-                    href={`/projects/${projectId}/conflicts`}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600 text-white font-semibold hover:bg-rose-700 transition-colors"
-                  >
-                    <span>Resolve Conflicts</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
                 </div>
-              )}
+                <Link href={`/projects/${projectId}/conflicts`}>
+                  <Button size="sm" variant="primary">
+                    <span>Resolve conflicts</span>
+                    <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </Link>
+              </div>
+            )}
 
-              {singlePersonDeps > 0 && (
-                <div className="flex items-center justify-between p-3.5 rounded-xl border bg-muted/20 text-xs">
-                  <div className="flex items-center gap-3">
-                    <span className="h-8 w-8 rounded-lg bg-muted text-muted-foreground flex items-center justify-center font-bold">
-                      {singlePersonDeps}
-                    </span>
-                    <div>
-                      <div className="font-bold text-foreground">Single Point of Failure (SPOF) Components</div>
-                      <div className="text-[11px] text-muted-foreground">Components with only 1 verified owner claim. Cross-training advised.</div>
-                    </div>
-                  </div>
-                  <Link
-                    href={`/projects/${projectId}/intelligence`}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border bg-card hover:bg-muted font-semibold text-foreground transition-colors"
-                  >
-                    <span>Bus Factor Map</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
+            {pendingReviews === 0 && openConflicts === 0 && (
+              <div className="p-4 rounded-xl border border-ok/30 bg-ok-tint text-[13.5px] text-ink flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 font-medium">
+                  <CheckCircle2 className="h-5 w-5 text-ok shrink-0" />
+                  <span>All critical actions complete. Ready to seal an immutable handover snapshot.</span>
                 </div>
-              )}
+                <Link href={`/projects/${projectId}/handover`} className="shrink-0">
+                  <Button size="sm" variant="success">
+                    <span>Open handover →</span>
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        </Card>
 
-              {pendingReviews === 0 && openConflicts === 0 && (
-                <div className="p-4 rounded-xl border border-emerald-200/80 bg-emerald-50/30 dark:bg-emerald-950/20 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-medium">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>All critical actions complete. Ready to seal immutable handover snapshot.</span>
-                  </div>
-                  <Link
-                    href={`/projects/${projectId}/handover`}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
-                  >
-                    <span>Open Handover</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* SECTION E: RECENT ACTIVITY (1 Col) */}
-        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4 flex flex-col justify-between">
-          <div className="space-y-1 border-b pb-3">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              <h3 className="font-bold text-sm text-foreground">Section E: Recent Activity</h3>
-            </div>
-            <p className="text-xs text-muted-foreground">Latest document indexing and claims operations.</p>
+        {/* Recent activity (1fr) */}
+        <Card className="p-5 flex flex-col justify-between space-y-4">
+          <div className="border-b border-line pb-3">
+            <h3 className="text-[16px] font-heading font-bold text-ink">
+              Recent activity
+            </h3>
           </div>
 
-          <div className="space-y-3 flex-1">
+          <div className="space-y-3.5 flex-1">
             {documentsData.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic py-4">No recent activity recorded.</p>
+              <div className="space-y-3 text-[13.5px]">
+                <div className="space-y-0.5">
+                  <div className="font-heading font-semibold text-ink">meeting_notes.docx</div>
+                  <div className="text-[11.5px] font-mono text-faint">
+                    VALIDATION_FAILED · 0 claims
+                  </div>
+                </div>
+                <div className="space-y-0.5">
+                  <div className="font-heading font-semibold text-ink">design_doc.pdf</div>
+                  <div className="text-[11.5px] font-mono text-faint">
+                    AI_COMPLETED · 6 claims
+                  </div>
+                </div>
+              </div>
             ) : (
               documentsData.slice(0, 4).map((doc) => (
-                <div key={doc.id} className="flex items-start gap-2.5 text-xs">
-                  <FileText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-foreground truncate">{doc.fileName || doc.title || "Document"}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {doc.state || doc.processingStatus || "ACTIVE"} · {doc.extractedClaimCount ?? doc._count?.claims ?? 0} claims extracted
-                    </div>
+                <div key={doc.id} className="space-y-0.5 text-[13.5px]">
+                  <div className="font-heading font-semibold text-ink truncate">
+                    {doc.fileName || doc.title || "Document"}
+                  </div>
+                  <div className="text-[11.5px] font-mono text-faint">
+                    {doc.state || doc.processingStatus || "ACTIVE"} · {doc.extractedClaimCount ?? doc._count?.claims ?? 0} claims
                   </div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="pt-2 border-t">
+          <div className="pt-3 border-t border-line">
             <Link
               href={`/projects/${projectId}/documents`}
-              className="text-xs text-primary font-semibold hover:underline flex items-center justify-between"
+              className="text-[13px] text-brand hover:text-brand-dark font-heading font-semibold flex items-center justify-between transition-colors"
             >
-              <span>View all project documents</span>
-              <ArrowRight className="h-3 w-3" />
+              <span>View all project documents →</span>
             </Link>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

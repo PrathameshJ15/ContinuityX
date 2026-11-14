@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { requireProjectAccess } from "@/lib/permissions";
 import { BadRequestError, NotFoundError } from "@/lib/api-response";
 import { writeAudit } from "@/lib/audit";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 
 export type RadarRuleId = "R1" | "R2" | "R3" | "R4" | "R5" | "R6";
 
@@ -74,7 +75,13 @@ export async function computeRadarAlertsService(
 ): Promise<{ alerts: RadarAlert[]; metrics: RadarMetrics }> {
   await requireProjectAccess(projectId, "project:read", userId);
 
-  // 1. Fetch all independent project data in parallel
+  const ruleFilter = filters?.ruleId || "ALL";
+  const statusFilter = filters?.status || "OPEN";
+  const cacheKey = `radar:${projectId}:${ruleFilter}:${statusFilter}`;
+  const cached = getCached<{ alerts: RadarAlert[]; metrics: RadarMetrics }>(cacheKey);
+  if (cached) {
+    return cached;
+  }
   const [claims, entities, conflicts, dismissals] = await Promise.all([
     // Non-rejected claims with relations
     prisma.claim.findMany({
@@ -556,7 +563,9 @@ export async function computeRadarAlertsService(
     filteredAlerts = filteredAlerts.filter((a) => a.status === "DISMISSED");
   }
 
-  return { alerts: filteredAlerts, metrics };
+  const result = { alerts: filteredAlerts, metrics };
+  setCached(cacheKey, result, 60);
+  return result;
 }
 
 /**
@@ -602,6 +611,8 @@ export async function dismissRadarAlertService(
     metadata: { ruleId, reason: reason.trim() },
   });
 
+  invalidateCache(projectId);
+
   return dismissal;
 }
 
@@ -635,6 +646,8 @@ export async function reactivateRadarAlertService(projectId: string, alertKey: s
     entityId: alertKey,
     metadata: { ruleId: existing.ruleId },
   });
+
+  invalidateCache(projectId);
 
   return { success: true, alertKey };
 }

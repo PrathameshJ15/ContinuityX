@@ -133,7 +133,7 @@ describe("Phase 4 Verification Service (Integration & Authorization)", () => {
           outcome: "SUPPORTS",
           reason: "Excerpt confirms camera calibration testing is completed.",
         }),
-        model: "gemini-3.5-flash",
+        model: "openai/gpt-oss-20b",
       }),
     };
 
@@ -236,7 +236,7 @@ describe("Phase 4 Verification Service (Integration & Authorization)", () => {
           outcome: "SUPPORTS",
           reason: "Excerpt confirms status is completed.",
         }),
-        model: "gemini-3.5-flash",
+        model: "openai/gpt-oss-20b",
       }),
     };
 

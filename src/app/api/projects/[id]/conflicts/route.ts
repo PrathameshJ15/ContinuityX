@@ -4,6 +4,7 @@ import { jsonSuccess, handleApiError, UnauthorizedError } from "@/lib/api-respon
 import { requireProjectAccess } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { ConflictResolutionState } from "@prisma/client";
+import { getCached, setCached } from "@/lib/cache";
 
 export async function GET(
   request: NextRequest,
@@ -24,6 +25,16 @@ export async function GET(
       Object.values(ConflictResolutionState).includes(statusParam as ConflictResolutionState)
         ? (statusParam as ConflictResolutionState)
         : undefined;
+
+    const cacheKey = `conflicts:route:${projectId}:${status || "ALL"}`;
+    const cached = getCached<unknown>(cacheKey);
+    if (cached) {
+      const duration = performance.now() - startTime;
+      console.log(`[API Timing] GET /api/projects/${projectId}/conflicts (cached) completed in ${duration.toFixed(2)} ms`);
+      const response = jsonSuccess(cached);
+      response.headers.set("Server-Timing", `total;dur=${duration.toFixed(2)}`);
+      return response;
+    }
 
     const where: { projectId: string; status?: ConflictResolutionState } = { projectId };
     if (status) where.status = status;
@@ -93,10 +104,13 @@ export async function GET(
       RESOLVED: allConflictsForCounts.filter((c) => c.status.startsWith("RESOLVED_")).length,
     };
 
+    const payload = { conflicts, totalProjectClaims, counts };
+    setCached(cacheKey, payload, 60);
+
     const duration = performance.now() - startTime;
     console.log(`[API Timing] GET /api/projects/${projectId}/conflicts completed in ${duration.toFixed(2)} ms`);
 
-    const response = jsonSuccess({ conflicts, totalProjectClaims, counts });
+    const response = jsonSuccess(payload);
     response.headers.set("Server-Timing", `total;dur=${duration.toFixed(2)}`);
     return response;
   } catch (error) {

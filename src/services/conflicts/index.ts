@@ -4,6 +4,7 @@ import { requireProjectAccess } from "@/lib/permissions";
 import { writeAudit } from "@/lib/audit";
 import { AppError } from "@/lib/api-response";
 import { verifyClaimService } from "@/services/verification";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 
 export type ConflictResolutionAction =
   | "CHOOSE_A"
@@ -26,6 +27,10 @@ export async function listConflictsService(
   userId?: string
 ) {
   await requireProjectAccess(projectId, "claims:view_unapproved", userId);
+
+  const cacheKey = `conflicts:${projectId}:${filters.status || "ALL"}`;
+  const cached = getCached<unknown[]>(cacheKey);
+  if (cached) return cached;
 
   const where: Prisma.ConflictWhereInput = { projectId };
   if (filters.status) {
@@ -77,6 +82,7 @@ export async function listConflictsService(
     },
   });
 
+  setCached(cacheKey, conflicts, 30);
   return conflicts;
 }
 
@@ -301,6 +307,8 @@ export async function resolveConflictService(input: ResolveConflictInput) {
   } catch {
     // Non-blocking: background re-verification can run asynchronously
   }
+
+  invalidateCache(input.projectId);
 
   return updatedConflict;
 }

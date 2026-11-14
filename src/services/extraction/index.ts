@@ -8,12 +8,13 @@ import { prisma } from "@/lib/db";
 import { requireProjectAccess } from "@/lib/permissions";
 import { writeAudit } from "@/lib/audit";
 import { AppError } from "@/lib/api-response";
+import { invalidateCache } from "@/lib/cache";
 import { env } from "@/lib/env";
 import {
   LLMProvider,
   executeWithRetryBackoff,
 } from "@/lib/ai/provider";
-import { getDefaultLLMProvider } from "@/lib/ai/gemini-provider";
+import { getDefaultLLMProvider } from "@/lib/ai/groq-provider";
 import {
   EXTRACTOR_PROMPT_VERSION,
   PromptRegistryEntity,
@@ -34,6 +35,7 @@ export interface ExtractDocumentOptions {
   model?: string;
   llmProvider?: LLMProvider;
   retryBaseDelayMs?: number;
+  chunkPacingDelayMs?: number;
   explicitUserId?: string;
 }
 
@@ -138,7 +140,7 @@ export async function extractDocumentClaimsService(
     );
   }
 
-  const model = opts.model?.trim() || env.GEMINI_EXTRACTION_MODEL;
+  const model = opts.model?.trim() || env.GROQ_EXTRACTION_MODEL;
   const promptVersion = EXTRACTOR_PROMPT_VERSION;
   const schemaVersion = EXTRACTOR_SCHEMA_VERSION;
   const inputChecksum = computeExtractionInputChecksum(document.checksum, document.chunks);
@@ -179,6 +181,8 @@ export async function extractDocumentClaimsService(
       });
     }
 
+    invalidateCache(projectId);
+
     return {
       cached: true,
       extractionRunId: recordedCacheRun.id,
@@ -215,8 +219,26 @@ export async function extractDocumentClaimsService(
   let flaggedClaims = 0;
 
   try {
+    const pacingDelayMs =
+      opts.chunkPacingDelayMs !== undefined
+        ? opts.chunkPacingDelayMs
+        : opts.retryBaseDelayMs === 0
+        ? 0
+        : 500;
+
     // Process chunks sequentially so entity registry evolves deterministically across chunks
-    for (const chunk of document.chunks) {
+    for (let chunkIdx = 0; chunkIdx < document.chunks.length; chunkIdx++) {
+      const chunk = document.chunks[chunkIdx];
+
+      // Skip empty or whitespace-only chunks entirely to save quota
+      if (!chunk.content || !chunk.content.trim()) {
+        continue;
+      }
+
+      if (chunkIdx > 0 && pacingDelayMs > 0) {
+        await new Promise((r) => setTimeout(r, pacingDelayMs));
+      }
+
       const chunkInjection = detectPromptInjection(chunk.content);
       if (chunkInjection.flagged) {
         flaggedChunks++;
@@ -267,6 +289,28 @@ export async function extractDocumentClaimsService(
               proposedType: candidate.proposedSubjectType,
             });
 
+            // Idempotency: skip creating duplicate claim if already exists for this chunk
+            if (typeof tx.claim.findFirst === "function") {
+              const existingClaim = await tx.claim.findFirst({
+                where: {
+                  projectId,
+                  subjectEntityId: resolvedEntity.entityId,
+                  attributeKey: candidate.attributeKey,
+                  valueRaw: candidate.valueRaw.trim(),
+                  evidence: {
+                    some: {
+                      documentId: document.id,
+                      chunkId: chunk.id,
+                    },
+                  },
+                },
+              });
+
+              if (existingClaim) {
+                continue;
+              }
+            }
+
             const valueNormalized = normalizeClaimValue(
               candidate.attributeKey,
               candidate.valueRaw
@@ -307,7 +351,9 @@ export async function extractDocumentClaimsService(
             createdHere++;
           }
 
-          return { createdHere, flaggedHere };
+          invalidateCache(projectId);
+
+    return { createdHere, flaggedHere };
         }, { maxWait: 30000, timeout: 60000 });
 
         claimsCreated += chunkResult.createdHere;
@@ -345,6 +391,8 @@ export async function extractDocumentClaimsService(
         flaggedClaims,
       },
     });
+
+    invalidateCache(projectId);
 
     return {
       cached: false,

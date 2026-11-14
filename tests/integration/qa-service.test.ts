@@ -7,7 +7,7 @@ import {
   FIXED_REFUSAL_MESSAGE,
 } from "@/services/intelligence/qa";
 import { ProjectNotFoundError } from "@/lib/api-response";
-import { GeminiLLMProvider } from "@/lib/ai/gemini-provider";
+import { GroqLLMProvider } from "@/lib/ai/groq-provider";
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -36,7 +36,7 @@ describe("Phase 8 Handover Q&A Service Integration", () => {
       project: { id: "proj-1", name: "ContinuityX", status: "ACTIVE" },
     }) as never;
 
-  let mockLLMProvider: GeminiLLMProvider;
+  let mockLLMProvider: GroqLLMProvider;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -56,7 +56,7 @@ describe("Phase 8 Handover Q&A Service Integration", () => {
 
     mockLLMProvider = {
       generateStructuredText: vi.fn(),
-    } as unknown as GeminiLLMProvider;
+    } as unknown as GroqLLMProvider;
   });
 
   it("1. returns fixed refusal and does NOT call model when no matching claims are retrieved", async () => {
@@ -129,7 +129,7 @@ describe("Phase 8 Handover Q&A Service Integration", () => {
         citedClaimIds: ["claim-hallucinated-999"],
         supported: true,
       }),
-      model: "models/gemini-2.0-flash",
+      model: "models/groq-2.0-flash",
       usage: { promptTokens: 10, candidateTokens: 10, totalTokens: 20 },
     });
 
@@ -170,7 +170,7 @@ describe("Phase 8 Handover Q&A Service Integration", () => {
         citedClaimIds: [],
         supported: false,
       }),
-      model: "models/gemini-2.0-flash",
+      model: "models/groq-2.0-flash",
       usage: { promptTokens: 10, candidateTokens: 10, totalTokens: 20 },
     });
 
@@ -215,7 +215,7 @@ describe("Phase 8 Handover Q&A Service Integration", () => {
         citedClaimIds: ["claim-101"],
         supported: true,
       }),
-      model: "models/gemini-2.0-flash",
+      model: "models/groq-2.0-flash",
       usage: { promptTokens: 10, candidateTokens: 10, totalTokens: 20 },
     });
 

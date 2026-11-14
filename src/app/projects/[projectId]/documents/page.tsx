@@ -637,13 +637,13 @@ export default function DocumentsPage({
                             <button
                               onClick={() => handleExtract(doc.id)}
                               disabled={extractingDocId === doc.id}
-                              className="inline-flex items-center gap-1 rounded-md bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors cursor-pointer disabled:opacity-50"
-                              title="Run automated claim extraction using Gemini LLM"
+                              className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1.5 text-[12px] font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition-colors cursor-pointer disabled:opacity-50 min-h-[36px]"
+                              title="Run automated claim extraction using Groq AI"
                             >
                               {extractingDocId === doc.id ? (
-                                <Loader2 className="h-3 w-3 animate-spin text-indigo-600" />
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-indigo-600" />
                               ) : (
-                                <Sparkles className="h-3 w-3 text-indigo-600" />
+                                <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
                               )}
                               <span>Extract</span>
                             </button>
@@ -652,20 +652,22 @@ export default function DocumentsPage({
                           {/* Inspect Chunks */}
                           <button
                             onClick={() => handleInspect(doc)}
-                            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            className="min-h-[38px] min-w-[38px] flex items-center justify-center p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                             title="Inspect parsed text chunks"
+                            aria-label="Inspect parsed text chunks"
                           >
-                            <Eye className="h-3.5 w-3.5" />
+                            <Eye className="h-4 w-4" />
                           </button>
 
                           {/* Retry */}
                           {isFailed && canUpload && (
                             <button
                               onClick={() => handleRetry(doc.id)}
-                              className="p-1.5 rounded-md text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
+                              className="min-h-[38px] min-w-[38px] flex items-center justify-center p-2 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
                               title="Retry pipeline execution"
+                              aria-label="Retry pipeline"
                             >
-                              <RotateCcw className="h-3.5 w-3.5" />
+                              <RotateCcw className="h-4 w-4" />
                             </button>
                           )}
 
@@ -673,10 +675,11 @@ export default function DocumentsPage({
                           {canUpload && (
                             <button
                               onClick={() => handleDelete(doc.id, doc.fileName)}
-                              className="p-1.5 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              className="min-h-[38px] min-w-[38px] flex items-center justify-center p-2 rounded-lg text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
                               title="Soft delete document"
+                              aria-label="Delete document"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           )}
                         </div>
@@ -749,14 +752,14 @@ export default function DocumentsPage({
 
             <label
               htmlFor="modalFileInput"
-              className="mt-3.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-xs hover:bg-accent transition-colors"
+              className="mt-3.5 inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground shadow-xs hover:bg-accent transition-colors min-h-[44px]"
             >
               Browse Files
             </label>
             <input
               id="modalFileInput"
               type="file"
-              accept=".pdf,.docx,.csv"
+              accept=".pdf,.docx,.csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) setSelectedFile(file);

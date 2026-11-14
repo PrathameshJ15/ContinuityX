@@ -4,10 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { formatRoleLabel } from "@/lib/roles";
+import { LogoSymbol } from "@/components/ui/logo";
 import {
-  ShieldCheck,
-  ChevronDown,
   LayoutDashboard,
   FileText,
   ListChecks,
@@ -18,12 +16,11 @@ import {
   BrainCircuit,
   Network,
   Users,
-  PanelLeftClose,
-  PanelLeft,
   LogOut,
   FolderKanban,
-  Check,
   Search,
+  Check,
+  ChevronDown,
 } from "lucide-react";
 
 export interface ProjectOption {
@@ -60,6 +57,7 @@ export interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onOpenSearch: () => void;
+  onCloseMobileDrawer?: () => void;
 }
 
 export function Sidebar({
@@ -69,6 +67,7 @@ export function Sidebar({
   collapsed,
   onToggleCollapse,
   onOpenSearch,
+  onCloseMobileDrawer,
 }: SidebarProps) {
   const pathname = usePathname();
   const [projectSwitcherOpen, setProjectSwitcherOpen] = React.useState(false);
@@ -89,7 +88,7 @@ export function Sidebar({
   const navGroups: NavGroup[] = projectId
     ? [
         {
-          title: "Overview",
+          title: "OVERVIEW",
           items: [
             {
               name: "Project Dashboard",
@@ -100,7 +99,7 @@ export function Sidebar({
           ],
         },
         {
-          title: "Knowledge",
+          title: "KNOWLEDGE",
           items: [
             {
               name: "Documents & Extraction",
@@ -120,7 +119,7 @@ export function Sidebar({
           ],
         },
         {
-          title: "Verification",
+          title: "VERIFICATION",
           items: [
             {
               name: "Pairwise Conflicts",
@@ -135,7 +134,7 @@ export function Sidebar({
           ],
         },
         {
-          title: "Continuity",
+          title: "CONTINUITY",
           items: [
             {
               name: "Knowledge Loss Radar",
@@ -150,7 +149,7 @@ export function Sidebar({
           ],
         },
         {
-          title: "Handover",
+          title: "HANDOVER",
           items: [
             {
               name: "Handover Workspace",
@@ -160,7 +159,7 @@ export function Sidebar({
           ],
         },
         {
-          title: "Governance",
+          title: "GOVERNANCE",
           items: [
             {
               name: "Team & Permissions",
@@ -172,7 +171,7 @@ export function Sidebar({
       ]
     : [
         {
-          title: "Workspace",
+          title: "WORKSPACE",
           items: [
             {
               name: "Workspace Overview",
@@ -193,158 +192,160 @@ export function Sidebar({
     }
   }
 
+  function isItemActive(item: NavItem) {
+    if (item.exact) {
+      return pathname === item.href;
+    }
+    return pathname.startsWith(item.href);
+  }
+
   return (
     <aside
       className={cn(
-        "flex flex-col border-r bg-card h-screen sticky top-0 z-30 transition-all duration-200 select-none",
-        collapsed ? "w-16" : "w-64"
+        "flex flex-col border-r border-line bg-card h-screen sticky top-0 z-30 transition-all duration-200 select-none",
+        collapsed ? "w-16" : "w-[268px]"
       )}
     >
-      {/* Top Header / Project Switcher */}
-      <div className="border-b px-3 py-3 relative" ref={switcherRef}>
-        <div className="flex items-center justify-between gap-1.5">
-          {!collapsed ? (
+      {/* Workspace Tile Header */}
+      <div className="border-b border-line p-3 relative" ref={switcherRef}>
+        {!collapsed ? (
+          <div className="flex items-center justify-between gap-1.5">
             <button
+              type="button"
               onClick={() => setProjectSwitcherOpen(!projectSwitcherOpen)}
-              className="flex-1 flex items-center justify-between p-1.5 rounded-xl hover:bg-muted/60 transition-colors text-left group"
+              className="flex-1 flex items-center gap-2.5 p-1 rounded-lg hover:bg-bg transition-colors text-left group min-w-0"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
-                  <ShieldCheck className="h-4 w-4" />
+              <div className="h-[34px] w-[34px] rounded-lg bg-tint flex items-center justify-center shrink-0 overflow-hidden border border-line/40">
+                <LogoSymbol size={22} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-heading font-bold text-ink truncate leading-tight">
+                  {currentProject ? currentProject.name : "ContinuityX Workspace"}
                 </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-foreground truncate leading-tight">
-                    {currentProject ? currentProject.name : "ContinuityX Workspace"}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                    <span>{currentProject ? "Active Project" : "Workspace Hub"}</span>
-                    {currentProject && (
-                      <span className="font-semibold text-primary uppercase">
-                        · {formatRoleLabel(currentProject.currentUserRole)}
-                      </span>
-                    )}
-                  </div>
+                <div className="text-[12px] text-faint flex items-center gap-1 mt-0.5">
+                  <span className="truncate">
+                    {currentProject
+                      ? `Active Project · ${currentProject.currentUserRole}`
+                      : "Workspace Hub"}
+                  </span>
                 </div>
               </div>
-              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0 transition-transform" />
+              <ChevronDown className="h-3.5 w-3.5 text-faint group-hover:text-ink shrink-0 transition-transform duration-150" />
             </button>
-          ) : (
-            <button
-              onClick={() => setProjectSwitcherOpen(!projectSwitcherOpen)}
-              className="mx-auto h-9 w-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center hover:bg-primary/20 transition-colors"
-              title={currentProject ? currentProject.name : "ContinuityX Workspace"}
-            >
-              <ShieldCheck className="h-4 w-4" />
-            </button>
-          )}
-
+          </div>
+        ) : (
           <button
+            type="button"
             onClick={onToggleCollapse}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="h-[34px] w-[34px] mx-auto rounded-lg bg-tint flex items-center justify-center border border-line/40 hover:opacity-80"
+            title="Expand sidebar"
           >
-            {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            <LogoSymbol size={22} />
           </button>
-        </div>
+        )}
 
         {/* Project Switcher Dropdown */}
-        {projectSwitcherOpen && (
-          <div className="absolute top-full left-2 right-2 mt-1 z-50 rounded-xl border bg-card shadow-2xl p-1.5 text-xs animate-in fade-in zoom-in-95 duration-100 max-h-72 overflow-y-auto">
-            <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {projectSwitcherOpen && !collapsed && (
+          <div className="absolute left-2 right-2 top-[58px] z-50 rounded-xl border border-line bg-card shadow-modal py-1.5 max-h-72 overflow-y-auto">
+            <div className="px-3 py-1.5 text-[11px] font-heading font-semibold uppercase tracking-wider text-faint">
               Switch Project
             </div>
             <Link
               href="/dashboard"
-              onClick={() => setProjectSwitcherOpen(false)}
-              className={cn(
-                "flex items-center justify-between p-2 rounded-lg hover:bg-muted/70 transition-colors",
-                !currentProject && "bg-muted font-semibold text-primary"
-              )}
+              onClick={() => {
+                setProjectSwitcherOpen(false);
+                onCloseMobileDrawer?.();
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-[13.5px] hover:bg-bg transition-colors text-ink"
             >
-              <div className="flex items-center gap-2">
-                <FolderKanban className="h-3.5 w-3.5 text-primary" />
-                <span>Workspace Dashboard</span>
-              </div>
-              {!currentProject && <Check className="h-3.5 w-3.5 text-primary" />}
+              <FolderKanban className="h-4 w-4 text-muted" />
+              <span>Workspace Overview</span>
             </Link>
-
-            {projects.map((proj) => (
-              <Link
-                key={proj.id}
-                href={`/projects/${proj.id}`}
-                onClick={() => setProjectSwitcherOpen(false)}
-                className={cn(
-                  "flex items-center justify-between p-2 rounded-lg hover:bg-muted/70 transition-colors",
-                  currentProject?.id === proj.id && "bg-muted font-semibold text-primary"
-                )}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="truncate">{proj.name}</span>
-                </div>
-                {currentProject?.id === proj.id && (
-                  <Check className="h-3.5 w-3.5 text-primary shrink-0" />
-                )}
-              </Link>
-            ))}
+            <div className="my-1 border-t border-line" />
+            {projects.length === 0 ? (
+              <div className="px-3 py-2 text-[12px] text-faint">No projects found</div>
+            ) : (
+              projects.map((p) => {
+                const isSelected = p.id === projectId;
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    onClick={() => {
+                      setProjectSwitcherOpen(false);
+                      onCloseMobileDrawer?.();
+                    }}
+                    className={cn(
+                      "flex items-center justify-between px-3 py-2 text-[13.5px] hover:bg-bg transition-colors",
+                      isSelected ? "text-brand font-semibold bg-tint/50" : "text-ink"
+                    )}
+                  >
+                    <div className="truncate mr-2">
+                      <div className="truncate">{p.name}</div>
+                      <div className="text-[11px] text-faint">
+                        {p.role || "Member"}
+                      </div>
+                    </div>
+                    {isSelected && <Check className="h-4 w-4 text-brand shrink-0" />}
+                  </Link>
+                );
+              })
+            )}
           </div>
         )}
       </div>
 
-      {/* Quick Search Button */}
-      <div className="px-3 pt-2.5">
-        <button
-          onClick={onOpenSearch}
-          className={cn(
-            "w-full flex items-center gap-2 rounded-xl border bg-muted/30 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors",
-            collapsed && "justify-center px-0"
-          )}
-          title="Search (Cmd+K)"
-        >
-          <Search className="h-3.5 w-3.5 shrink-0" />
-          {!collapsed && (
-            <>
-              <span className="flex-1 text-left text-xs">Quick Search...</span>
-              <kbd className="rounded border bg-background px-1.5 py-0.2 text-[10px] font-mono text-muted-foreground">
-                ⌘K
-              </kbd>
-            </>
-          )}
-        </button>
-      </div>
+      {/* Quick Search Ctrl K */}
+      {!collapsed && (
+        <div className="px-3 pt-3 pb-1">
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg border border-line bg-bg text-[13px] text-faint hover:text-ink hover:border-muted transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Search className="h-3.5 w-3.5" />
+              <span>Quick search...</span>
+            </div>
+            <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-card border border-line text-faint">
+              Ctrl K
+            </kbd>
+          </button>
+        </div>
+      )}
 
-      {/* Navigation Group Items */}
-      <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4">
-        {navGroups.map((group, gIdx) => (
-          <div key={gIdx} className="space-y-0.5">
+      {/* Nav List */}
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
+        {navGroups.map((group) => (
+          <div key={group.title} className="space-y-1">
             {!collapsed && (
-              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+              <div className="px-2.5 pb-1 text-[11px] font-heading font-semibold uppercase tracking-wider text-faint select-none">
                 {group.title}
               </div>
             )}
             {group.items.map((item) => {
+              const active = isItemActive(item);
               const Icon = item.icon;
-              const isActive = item.exact
-                ? pathname === item.href
-                : pathname.startsWith(item.href);
-
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs font-medium transition-all group",
-                    collapsed && "justify-center px-0 py-2.5",
-                    isActive
-                      ? "bg-primary text-primary-foreground font-semibold shadow-[0_1px_2px_rgba(79,70,229,0.25)]"
-                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                  )}
+                  onClick={() => onCloseMobileDrawer?.()}
                   title={collapsed ? item.name : undefined}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-lg transition-colors duration-150 select-none text-[14.5px]",
+                    collapsed
+                      ? "justify-center h-10 w-10 mx-auto"
+                      : "px-3 py-2.5 min-h-[44px]",
+                    active
+                      ? "bg-brand text-white font-semibold shadow-sm"
+                      : "text-muted hover:text-ink hover:bg-bg"
+                  )}
                 >
                   <Icon
                     className={cn(
-                      "h-4 w-4 shrink-0 transition-transform group-hover:scale-105",
-                      isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
+                      "h-[15px] w-[15px] shrink-0",
+                      active ? "text-white" : "text-muted group-hover:text-ink"
                     )}
                   />
                   {!collapsed && <span className="truncate">{item.name}</span>}
@@ -355,36 +356,39 @@ export function Sidebar({
         ))}
       </nav>
 
-      {/* Footer / User Profile */}
-      <div className="border-t p-2.5 bg-muted/10">
+      {/* User Block Pinned to Bottom */}
+      <div className="border-t border-line p-3">
         {!collapsed ? (
-          <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl hover:bg-muted/50 transition-colors">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="h-8 w-8 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs shrink-0">
-                {user?.name ? user.name[0]?.toUpperCase() : "U"}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-8 w-8 rounded-full bg-tint text-brand font-heading font-bold text-xs flex items-center justify-center shrink-0 border border-line">
+                {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-semibold text-foreground truncate">
-                  {user?.name || "User"}
+                <div className="text-[13px] font-heading font-semibold text-ink truncate leading-tight">
+                  {user?.name || "Continuity User"}
                 </div>
-                <div className="text-[10px] text-muted-foreground truncate">
-                  {user?.email || ""}
+                <div className="text-[11.5px] text-faint truncate leading-tight mt-0.5">
+                  {user?.email || "user@continuityx.demo"}
                 </div>
               </div>
             </div>
             <button
+              type="button"
               onClick={handleLogout}
-              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-rose-600 transition-colors shrink-0"
-              title="Sign Out"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-lg text-faint hover:text-bad hover:bg-bad-tint/50 transition-colors"
+              title="Sign out"
+              aria-label="Sign out"
             >
               <LogOut className="h-4 w-4" />
             </button>
           </div>
         ) : (
           <button
+            type="button"
             onClick={handleLogout}
-            className="w-full flex items-center justify-center h-8 rounded-lg text-muted-foreground hover:bg-muted hover:text-rose-600 transition-colors"
-            title="Sign Out"
+            className="h-10 w-10 mx-auto rounded-lg flex items-center justify-center text-faint hover:text-bad hover:bg-bad-tint/50"
+            title="Sign out"
           >
             <LogOut className="h-4 w-4" />
           </button>

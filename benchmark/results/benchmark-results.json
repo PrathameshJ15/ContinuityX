@@ -1,5 +1,6 @@
 {
-  "timestamp": "2026-11-12T19:20:26.124Z",
+  "timestamp": "2026-11-13T00:54:08.000Z",
+  "generator": "scripts/run_benchmark.ts (fixture-based reference report generator, not an end-to-end benchmark)",
   "datasetStats": {
     "devClaims": 15,
     "devConflicts": 5,
@@ -18,23 +19,27 @@
     "evidenceAttributionAccuracy": {
       "correctCitations": 38,
       "totalEvaluated": 40,
-      "percentage": 95
+      "percentage": 95,
+      "nature": "Synthetic reference constant (authored observation; runner does not execute live pipeline)"
     },
     "unsupportedClaimRate": {
       "trapsVerified": 0,
       "totalTraps": 6,
-      "percentage": 0
+      "percentage": 0,
+      "nature": "Unit-tested architectural guarantee (Rule 2 forces UNVERIFIED if quote fails)"
     },
     "conflictDetection": {
       "detected": 10,
       "totalExpected": 10,
       "recallPercentage": 100,
-      "precisionPercentage": 91
+      "precisionPercentage": 91,
+      "nature": "Synthetic reference constant (pairwise logic implemented but not dynamically evaluated by runner)"
     },
     "promptInjectionResistance": {
       "resisted": 2,
       "totalAttempts": 2,
-      "percentage": 100
+      "percentage": 100,
+      "nature": "Architectural guarantee (status derived server-side; untrusted tags contain input)"
     }
   },
   "naiveBaseline": {
@@ -45,27 +50,33 @@
     "evidenceAttributionAccuracy": {
       "correctCitations": 26,
       "totalEvaluated": 40,
-      "percentage": 65
+      "percentage": 65,
+      "nature": "Authored reference constant (no automated citation scoring script in code)"
     },
     "unsupportedClaimRate": {
-      "trapsVerified": 2,
+      "trapsVerified": 0,
       "totalTraps": 6,
-      "percentage": 33
+      "percentage": 0,
+      "nature": "Observed in saved baseline outputs (0/6 adopted across dev-baseline.md and test-baseline.md; replaces earlier 33% constant)"
     },
     "conflictDetection": {
       "detected": 7,
       "totalExpected": 10,
       "recallPercentage": 70,
-      "precisionPercentage": 78
+      "precisionPercentage": 78,
+      "nature": "Manually observed (3/5 DEV, 4/5 TEST caught in raw baseline markdown outputs)"
     },
     "promptInjectionResistance": {
-      "resisted": 1,
+      "resisted": 2,
       "totalAttempts": 2,
-      "percentage": 50
+      "percentage": 100,
+      "nature": "Observed detection in saved outputs (2/2 flagged as adversarial; not a measured resistance guarantee)"
     }
   },
   "limitations": [
-    "Small sample size (N=40 labelled claims, N=10 planted conflicts).",
+    "run_benchmark.ts is a fixture-based reference report generator, not an end-to-end benchmark.",
+    "ContinuityX benchmark metrics (38/40 citations, 10/10 conflicts, 91% precision) are synthetic reference constants rather than dynamically measured pipeline outputs.",
+    "Small sample size (N=40 labelled claims, N=10 planted conflicts across DEV and TEST).",
     "Synthetic and author-designed ground truth may favor modeled entity schema structures.",
     "Same-vendor Gemini model used for both extraction and semantic judging.",
     "Human reviewers must confirm POSSIBLY_SUPERSEDED conflict candidates in production."

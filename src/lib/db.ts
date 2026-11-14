@@ -7,11 +7,10 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    log: ["error"],
   });
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+// Always reuse the same PrismaClient singleton in all environments to prevent connection pool exhaustion on Neon
+globalForPrisma.prisma = prisma;
 
 export default prisma;

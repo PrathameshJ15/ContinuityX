@@ -137,7 +137,7 @@ export function parseAndValidateExtractionResponse(
 }
 
 /**
- * JSON Schema representation passed to Gemini structured JSON generation.
+ * JSON Schema representation passed to Groq structured JSON generation.
  */
 export const EXTRACTION_RESPONSE_JSON_SCHEMA: Record<string, unknown> = {
   type: "object",

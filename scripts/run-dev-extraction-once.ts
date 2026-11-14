@@ -116,7 +116,7 @@ async function main() {
           });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          const fallbackModel = process.env.GEMINI_JUDGE_MODEL || "gemini-3.5-flash";
+          const fallbackModel = process.env.GROQ_VERIFICATION_MODEL || "openai/gpt-oss-20b";
           if (/high demand|503|unavailable/i.test(msg)) {
             console.error(
               `[DEV-CHECK] Primary model unavailable (${msg}); retrying ${item.fileName} with ${fallbackModel}...`

@@ -2,6 +2,7 @@ import * as React from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { LucideIcon, FileText, CheckCircle2, ShieldCheck, AlertCircle, ArrowRight } from "lucide-react";
+import { Button } from "./button";
 
 export interface EmptyStateProps {
   type?: "no-data" | "checked-empty" | "completed" | "error" | "custom";
@@ -36,49 +37,55 @@ export function EmptyState({
       ? AlertCircle
       : FileText);
 
-  const iconColor =
-    type === "checked-empty" || type === "completed"
-      ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200/60"
-      : type === "error"
-      ? "text-rose-500 bg-rose-50 dark:bg-rose-950/40 border-rose-200/60"
-      : "text-muted-foreground bg-muted/50 border-border/60";
+  const iconStyles = {
+    "no-data": "text-muted bg-bg border-line",
+    "checked-empty": "text-ok bg-ok-tint border-ok/20",
+    completed: "text-ok bg-ok-tint border-ok/20",
+    error: "text-bad bg-bad-tint border-bad/20",
+    custom: "text-brand bg-tint border-brand/20",
+  };
 
   return (
     <div
       className={cn(
-        "rounded-2xl border border-dashed border-border/80 bg-card/60 p-10 text-center flex flex-col items-center justify-center max-w-xl mx-auto",
+        "rounded-xl border border-line bg-card p-8 sm:p-10 text-center flex flex-col items-center justify-center max-w-lg mx-auto select-none",
         className
       )}
     >
-      <div className={cn("h-12 w-12 rounded-2xl border flex items-center justify-center mb-3.5 shadow-sm", iconColor)}>
-        <IconComponent className="h-6 w-6" />
+      <div
+        className={cn(
+          "h-11 w-11 rounded-lg border flex items-center justify-center mb-3",
+          iconStyles[type]
+        )}
+      >
+        <IconComponent className="h-5 w-5" />
       </div>
 
-      <h3 className="text-base font-semibold text-foreground tracking-tight">{title}</h3>
+      <h4 className="text-[15px] font-heading font-bold text-ink leading-snug">
+        {title}
+      </h4>
       {description && (
-        <p className="mt-1 text-xs text-muted-foreground leading-relaxed max-w-md">{description}</p>
+        <p className="mt-1 text-[13.5px] text-muted max-w-sm leading-normal">
+          {description}
+        </p>
       )}
 
       {children}
 
       {(actionHref || onAction) && actionLabel && (
-        <div className="mt-5">
+        <div className="mt-4">
           {actionHref ? (
-            <Link
-              href={actionHref}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 shadow-sm transition-all active:scale-[0.98]"
-            >
-              <span>{actionLabel}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
+            <Link href={actionHref}>
+              <Button size="sm" variant="primary">
+                <span>{actionLabel}</span>
+                <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+              </Button>
             </Link>
           ) : (
-            <button
-              onClick={onAction}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 shadow-sm transition-all active:scale-[0.98]"
-            >
+            <Button size="sm" variant="primary" onClick={onAction}>
               <span>{actionLabel}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+              <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+            </Button>
           )}
         </div>
       )}

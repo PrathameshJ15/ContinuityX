@@ -11,6 +11,7 @@ import { getParserForMimeType, ParsedSegment } from "./parsers";
 import { createStructureAwareChunks } from "./chunking";
 import { AppError } from "@/lib/api-response";
 import { writeAudit } from "@/lib/audit";
+import { getCached, setCached, invalidateCache } from "@/lib/cache";
 import {
   DocumentProcessingStatus,
   Prisma,
@@ -137,6 +138,8 @@ export async function uploadDocumentService(input: UploadDocumentInput) {
       sourceDateBasis: doc.sourceDateBasis,
     },
   });
+
+  invalidateCache(input.projectId);
 
   return doc;
 }
@@ -455,6 +458,33 @@ export async function listDocumentsService(
   const safeLimit = Math.min(50, Math.max(1, Number.isFinite(limit) ? limit : 10));
   const skip = (safePage - 1) * safeLimit;
 
+  const cacheKey = `docs:${projectId}:${safePage}:${safeLimit}`;
+  const cached = getCached<{
+    documents: Array<{
+      id: string;
+      fileName: string;
+      mimeType: string;
+      fileSize: number;
+      checksum: string;
+      pageCount: number;
+      textQuality: string;
+      sourceDate: Date | null;
+      sourceDateBasis: string;
+      processingStatus: string;
+      uploadedAt: Date;
+      chunkCount: number;
+      uploadedBy: { name: string; email: string } | null;
+      lastJob: { state: string; attempts: number; lastError: string | null } | null;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  }>(cacheKey);
+  if (cached) return cached;
+
   const where = { projectId, deletedAt: null };
 
   const [total, documents] = await Promise.all([
@@ -484,7 +514,7 @@ export async function listDocumentsService(
     }),
   ]);
 
-  return {
+  const result = {
     documents: documents.map((doc) => ({
       id: doc.id,
       fileName: doc.fileName,
@@ -508,6 +538,9 @@ export async function listDocumentsService(
       totalPages: Math.max(1, Math.ceil(total / safeLimit)),
     },
   };
+
+  setCached(cacheKey, result, 60);
+  return result;
 }
 
 export async function getDocumentService(
@@ -572,6 +605,8 @@ export async function softDeleteDocumentService(
     entityId: document.id,
     metadata: { fileName: document.fileName },
   });
+
+  invalidateCache(projectId);
 
   return { success: true };
 }

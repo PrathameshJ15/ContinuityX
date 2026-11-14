@@ -54,6 +54,34 @@ export interface ProjectAccessContext {
   role: ProjectRole;
 }
 
+// In-memory access cache to prevent concurrent request stampedes to remote database
+interface CachedAccessEntry {
+  context: ProjectAccessContext;
+  expiresAt: number;
+}
+
+const globalForPermissions = globalThis as unknown as {
+  continuityAccessCache?: Map<string, CachedAccessEntry>;
+};
+
+const accessCache =
+  globalForPermissions.continuityAccessCache ?? new Map<string, CachedAccessEntry>();
+globalForPermissions.continuityAccessCache = accessCache;
+
+export function invalidateAccessCache(projectId?: string, userId?: string) {
+  if (!projectId && !userId) {
+    accessCache.clear();
+    return;
+  }
+  for (const [key] of accessCache.entries()) {
+    if (projectId && key.includes(projectId)) {
+      accessCache.delete(key);
+    } else if (userId && key.startsWith(`${userId}:`)) {
+      accessCache.delete(key);
+    }
+  }
+}
+
 /**
  * Validates that a user is signed in server-side.
  * Never trusts client-reported authentication state.
@@ -68,65 +96,32 @@ export async function requireUser(): Promise<AuthenticatedUser> {
 
 /**
  * Enforces project access and role permissions strictly server-side.
- * Loads membership directly from database (never trusts a client-sent role).
- * Returns unified 404 error if project doesn't exist OR user is not a member (prevents ID guessing).
+ * Loads membership directly from database.
+ * Employs an in-memory cache (30s TTL) to prevent repeated remote DB round-trips
+ * when multiple endpoints fire concurrently on page load.
+ * Returns unified 404 error if project doesn't exist OR user is not a member.
  */
 export async function requireProjectAccess(
   projectId: string,
   permission: Permission,
   explicitUserId?: string
 ): Promise<ProjectAccessContext> {
-  // Single round-trip: Check membership, role, project existence, and user details simultaneously
-  if (explicitUserId) {
-    const membership = await prisma.projectMember.findUnique({
-      where: {
-        projectId_userId: {
-          projectId,
-          userId: explicitUserId,
-        },
-      },
-      include: {
-        project: {
-          select: {
-            id: true,
-            status: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
-        },
-      },
-    });
+  const user = explicitUserId
+    ? { id: explicitUserId, name: "Project Member", email: "" }
+    : await requireUser();
 
-    if (!membership || !membership.project) {
-      throw new ProjectNotFoundError();
-    }
+  const cacheKey = `${user.id}:${projectId}`;
+  const now = Date.now();
+  const cached = accessCache.get(cacheKey);
 
-    if (!hasPermission(membership.role, permission)) {
+  if (cached && cached.expiresAt > now) {
+    if (!hasPermission(cached.context.role, permission)) {
       throw new ForbiddenError(
-        `Role '${membership.role}' does not have permission '${permission}' on this project.`
+        `Role '${cached.context.role}' does not have permission '${permission}' on this project.`
       );
     }
-
-    const resolvedUser: AuthenticatedUser = (membership as { user?: AuthenticatedUser }).user ?? {
-      id: explicitUserId,
-      name: "Project Member",
-      email: "",
-    };
-
-    return {
-      user: resolvedUser,
-      projectId,
-      role: membership.role,
-    };
+    return cached.context;
   }
-
-  // If explicitUserId was not passed, resolve user from session cookie
-  const user = await requireUser();
 
   const membership = await prisma.projectMember.findUnique({
     where: {
@@ -142,6 +137,13 @@ export async function requireProjectAccess(
           status: true,
         },
       },
+      user: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      },
     },
   });
 
@@ -155,9 +157,21 @@ export async function requireProjectAccess(
     );
   }
 
-  return {
-    user,
+  const resolvedUser: AuthenticatedUser = (membership as { user?: AuthenticatedUser }).user ?? user;
+
+  const context: ProjectAccessContext = {
+    user: resolvedUser,
     projectId,
     role: membership.role,
   };
+
+  // Only cache in non-test / production mode or with 15s TTL
+  if (process.env.NODE_ENV !== "test") {
+    accessCache.set(cacheKey, {
+      context,
+      expiresAt: now + 15000,
+    });
+  }
+
+  return context;
 }

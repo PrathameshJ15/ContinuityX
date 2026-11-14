@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireProjectAccess } from "@/lib/permissions";
-import { GeminiLLMProvider } from "@/lib/ai/gemini-provider";
+import { GroqLLMProvider } from "@/lib/ai/groq-provider";
 import { env } from "@/lib/env";
 import { writeAudit } from "@/lib/audit";
 
@@ -92,7 +92,7 @@ function extractCategoryKeywords(questionLower: string): string[] {
  */
 export async function askHandoverQuestionService(
   request: QARequest,
-  llmProvider: GeminiLLMProvider = new GeminiLLMProvider()
+  llmProvider: GroqLLMProvider = new GroqLLMProvider()
 ): Promise<QAResponse> {
   const { projectId, question, userId } = request;
   await requireProjectAccess(projectId, "qa:ask_approved", userId);
@@ -202,7 +202,7 @@ export async function askHandoverQuestionService(
     };
   }
 
-  // 3. Build untrusted structured data for Gemini model call
+  // 3. Build untrusted structured data for Groq model call
   const serializedClaims = retrievedClaims.map((c) => ({
     claimId: c.id,
     subject: c.subjectEntity.canonicalName,
@@ -255,7 +255,7 @@ Answer based strictly on the approved claims above. If supported, list the exact
 
     const llmResponse = await Promise.race([
       llmProvider.generateStructuredText({
-        model: env.GEMINI_JUDGE_MODEL || env.GEMINI_EXTRACTION_MODEL,
+        model: env.GROQ_VERIFICATION_MODEL || env.GROQ_EXTRACTION_MODEL,
         systemInstruction,
         userPrompt,
         temperature: 0,

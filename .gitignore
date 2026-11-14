@@ -44,3 +44,9 @@ next-env.d.ts
 # storage (local development private storage)
 storage/
 demo-data/temp/
+
+# local scratch & media
+cookies.txt
+*.zip
+/Landing page@1x.png
+/MoEr3_*.jpg
