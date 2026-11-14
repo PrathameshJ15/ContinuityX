@@ -301,6 +301,6 @@ export async function getReviewQueueService(
     },
     queue: queueItems,
   };
-  setCached(cacheKey, result, 30);
+  setCached(cacheKey, result, 180);
   return result;
 }

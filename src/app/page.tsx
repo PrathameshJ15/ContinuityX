@@ -40,14 +40,26 @@ export default function LandingPage() {
           </nav>
 
           {/* Right Action */}
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/login"
+              className="text-[13.5px] font-medium text-muted hover:text-ink transition-colors px-2.5 py-2 min-h-[44px] inline-flex items-center"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/register"
+              className="inline-flex items-center justify-center rounded-[6px] bg-[#2563EB] dark:bg-brand px-3.5 py-2 text-[13px] font-medium text-white hover:bg-[#1D4ED8] dark:hover:bg-brand-dark transition-colors shadow-sm min-h-[44px]"
+            >
+              Sign up
+            </Link>
             <Link
               href="/dashboard"
-              className="inline-flex items-center justify-center rounded-[6px] bg-[#111827] dark:bg-card dark:border dark:border-line px-4 py-2 text-[13px] font-medium text-white dark:text-ink hover:bg-[#1F2937] dark:hover:bg-bg transition-colors shadow-sm min-h-[44px] min-w-[44px]"
+              className="hidden sm:inline-flex items-center justify-center rounded-[6px] bg-[#111827] dark:bg-card dark:border dark:border-line px-3.5 py-2 text-[13px] font-medium text-white dark:text-ink hover:bg-[#1F2937] dark:hover:bg-bg transition-colors shadow-sm min-h-[44px]"
             >
-              Open the demo
+              Open demo
             </Link>
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -74,8 +86,14 @@ export default function LandingPage() {
             {/* Buttons */}
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
-                href="/dashboard"
+                href="/register"
                 className="inline-flex items-center justify-center rounded-[6px] bg-[#2563EB] dark:bg-brand px-5 py-2.5 text-[14px] font-medium text-white hover:bg-[#1D4ED8] dark:hover:bg-brand-dark transition-colors shadow-sm min-h-[44px]"
+              >
+                Sign up free
+              </Link>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center rounded-[6px] bg-[#111827] dark:bg-card dark:border dark:border-line px-5 py-2.5 text-[14px] font-medium text-white dark:text-ink hover:bg-[#1F2937] dark:hover:bg-bg transition-colors shadow-sm min-h-[44px]"
               >
                 Open the demo
               </Link>
@@ -513,13 +531,25 @@ export default function LandingPage() {
             </p>
           </div>
 
-          {/* Right: Open the demo button */}
-          <div className="flex flex-col items-start min-[901px]:items-end">
+          {/* Right: Actions */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-[6px] border border-white/20 bg-transparent px-4 py-2.5 text-[13.5px] font-medium text-white hover:bg-white/10 transition-colors shadow-sm min-h-[44px]"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/register"
+              className="inline-flex items-center justify-center rounded-[6px] bg-[#2563EB] dark:bg-brand px-5 py-2.5 text-[13.5px] font-medium text-white hover:bg-[#1D4ED8] dark:hover:bg-brand-dark transition-colors shadow-sm min-h-[44px]"
+            >
+              Create account
+            </Link>
             <Link
               href="/dashboard"
-              className="inline-flex items-center justify-center rounded-[6px] bg-[#2563EB] dark:bg-brand px-6 py-2.5 text-[14px] font-medium text-white hover:bg-[#1D4ED8] dark:hover:bg-brand-dark transition-colors shadow-sm min-h-[44px]"
+              className="inline-flex items-center justify-center rounded-[6px] bg-white/10 border border-white/20 px-4 py-2.5 text-[13.5px] font-medium text-white hover:bg-white/20 transition-colors shadow-sm min-h-[44px]"
             >
-              Open the demo
+              Open demo
             </Link>
           </div>
         </div>

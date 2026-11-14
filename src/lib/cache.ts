@@ -28,7 +28,7 @@ export function getCached<T>(key: string): T | undefined {
   return entry.data as T;
 }
 
-export function setCached<T>(key: string, data: T, ttlSeconds: number = 30): void {
+export function setCached<T>(key: string, data: T, ttlSeconds: number = 180): void {
   memoryCache.set(key, {
     data,
     expiresAt: Date.now() + ttlSeconds * 1000,
